@@ -42,6 +42,6 @@ goto launch
 
 :launch
 
-REM Launch in a new window and keep it open to show any errors
-start /wait "Scrapitor Proxy" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File "%SCRIPT%"
-exit /b 0
+REM Run in the same console so only one window is shown. Keep open on errors via the script itself.
+"%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
+exit /b %ERRORLEVEL%

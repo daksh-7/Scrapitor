@@ -8,7 +8,7 @@ Prefer the shortest path? Jump to [Casual Usage](#casual-usage).
 
 - [Features](#features)
 - [Directory Structure](#directory-structure)
-- [Quick Start (Windows)](#quick-start-windows)
+- [Installation](#installation)
 - [Casual Usage](#casual-usage)
 - [Usage in Janitor](#usage-in-janitor)
 - [How It Works](#how-it-works)
@@ -66,9 +66,19 @@ Runtime directories are created under `Scrapitor/app/var/`:
 - State: `Scrapitor/app/var/state/` (e.g., `tunnel_url.txt`, `parser_settings.json`)
 
 
-## Quick Start (Windows)
+## Installation
 
-Prerequisites:
+1) Download the repository:
+
+- Option A: Download ZIP from GitHub: `https://github.com/daksh-7/Scrapitor` → Code → Download ZIP → Unzip anywhere.
+- Option B: Clone via Git:
+
+```powershell
+winget install git.git
+git clone https://github.com/daksh-7/Scrapitor
+```
+
+2) Prerequisites on Windows:
 
 - PowerShell 7 (`pwsh`). If you don't have it, install with:
 
@@ -78,7 +88,9 @@ winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept
 
 - Python 3.10+ in PATH. Download for Windows: https://www.python.org/downloads/ (During setup, enable "Add python.exe to PATH").
 
-1) Double-click `Scrapitor\run.bat`.
+3) Run the launcher:
+
+- Double-click `Scrapitor\run.bat`.
 
 The launcher will:
 
@@ -92,9 +104,12 @@ Copy the “JanitorAI API URL” shown in the console or the UI (it ends with `/
 
 ## Casual Usage
 
-If you just want to use scrapitor with JanitorAI quickly:
+If you just want to use scrapitor with JanitorAI quickly, start with one of these two options:
 
-1) Run `Scrapitor\run.bat` and wait until “SUCCESS! Proxy is running”.
+- Option A (no Git needed): Download ZIP from `https://github.com/daksh-7/Scrapitor`, unzip, then run `Scrapitor\run.bat`.
+- Option B (with Git): If you don’t have Git, install it: `winget install git.git`. Then `git clone https://github.com/daksh-7/Scrapitor` and run `Scrapitor\run.bat`.
+
+After launch, wait until “SUCCESS! Proxy is running”.
 2) In the dashboard “Setup” section, copy the “Cloudflare Endpoint” and the “Model Name Preset”.
 3) Follow the steps in [Usage in Janitor](#usage-in-janitor) to wire JanitorAI to your Cloudflare endpoint.
 4) Send a message in JanitorAI; your request appears in “Activity”.
