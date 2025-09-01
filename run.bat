@@ -3,6 +3,35 @@ setlocal
 REM Run from this script's directory
 cd /d "%~dp0"
 
+REM Optional: Update repo if Git is available and this is a git clone
+set "REPO_DIR=%~dp0"
+set "HAS_GIT=0"
+where git >nul 2>nul
+if not errorlevel 1 (
+  set "HAS_GIT=1"
+)
+
+if "%HAS_GIT%"=="1" (
+  if exist ".git" (
+    echo Updating Scrapitor from origin...
+    git -C "%REPO_DIR%" fetch --all --tags --prune
+    if errorlevel 1 (
+      echo Git fetch failed. Proceeding without updating.
+    ) else (
+      git -C "%REPO_DIR%" pull --rebase --autostash
+      if errorlevel 1 echo Git pull failed (local changes or connectivity). Proceeding without updating.
+    )
+  ) else (
+    echo This folder is not a Git clone. To receive updates automatically, use Git:
+    echo   winget install git.git
+    echo   git clone https://github.com/daksh-7/Scrapitor
+  )
+) else (
+  echo Git was not found. To update in the future, either:
+  echo   - Download the latest ZIP: https://github.com/daksh-7/Scrapitor
+  echo   - Or install Git: winget install git.git
+)
+
 REM Target script path
 set "SCRIPT=%~dp0app\scripts\run_proxy.ps1"
 if not exist "%SCRIPT%" (
