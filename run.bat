@@ -34,12 +34,14 @@ if "%HAS_PWSH%"=="0" (
   echo    winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
   echo.
   echo After installation, re-run this script.
+  echo.
+  pause
   exit /b 1
 )
 goto launch
 
 :launch
 
-REM Launch in a new window to avoid the "Terminate batch job (Y/N)?" prompt
-start "Scrapitor Proxy" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
+REM Launch in a new window and keep it open to show any errors
+start /wait "Scrapitor Proxy" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File "%SCRIPT%"
 exit /b 0
