@@ -1,14 +1,3 @@
-<#
-    One-click launcher for the Flask proxy + Cloudflare tunnel.
-
-    Improvements:
-    - Runs from the script directory reliably (fixes app.py not found).
-    - Creates/uses a local virtualenv (.venv) automatically.
-    - Installs Python dependencies from requirements.txt if needed.
-    - Waits for the Flask /health endpoint instead of a fixed sleep.
-    - Better Python discovery: prefers .venv, then py -3, then python.
-#>
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
