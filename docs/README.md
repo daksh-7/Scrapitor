@@ -2,7 +2,7 @@
 
 Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. A one-click Windows launcher provisions a Cloudflare tunnel for easy external access.
 
-Prefer the shortest path? Jump to [Casual Usage](#casual-usage).
+If you prefer the shortest path, jump to [Casual Usage](#casual-usage).
 
 ## Table of Contents
 
