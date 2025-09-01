@@ -230,6 +230,25 @@ Write-Host ""
 Write-ColorOutput "====== Janitor Local Proxy ======" -Color Yellow
 Write-Host ""
 
+# Robust Ctrl+C handling: use a pure .NET handler to set a flag, then
+# poll it from the main loop and perform cleanup + confirm exit on the main thread.
+try {
+    Add-Type -Language CSharp -ErrorAction SilentlyContinue @"
+using System;
+public static class ScrapitorCancel
+{
+    public static volatile bool StopRequested = false;
+    public static void OnCancel(object sender, ConsoleCancelEventArgs e)
+    {
+        e.Cancel = true; // suppress default abrupt termination
+        StopRequested = true;
+    }
+}
+"@
+} catch {}
+try { $cancelHandler = [System.ConsoleCancelEventHandler]::new([ScrapitorCancel]::OnCancel) } catch { $cancelHandler = $null }
+if ($cancelHandler) { try { [Console]::add_CancelKeyPress($cancelHandler) | Out-Null } catch {} }
+
 # Resolve Python (prefer local venv, then py, then real python; avoid Windows Store stubs)
 $VenvPython   = Join-Path $AppRoot ".venv\Scripts\python.exe"
 $VenvPythonW  = Join-Path $AppRoot ".venv\Scripts\pythonw.exe"
@@ -667,6 +686,7 @@ if ($url -and $url.Trim()) {
     Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action $cleanupBlock | Out-Null
 
     # Keep the script running
+    $didCleanup = $false
     try {
         while ($true) {
             # Check if processes are still running
@@ -675,15 +695,25 @@ if ($url -and $url.Trim()) {
                 & $cleanupBlock
                 exit 1
             }
+
+            if ([ScrapitorCancel]::StopRequested) {
+                Write-ColorOutput "Stopping on user request..." -Color Yellow
+                & $cleanupBlock
+                $didCleanup = $true
+                try { if ($cancelHandler) { [Console]::remove_CancelKeyPress($cancelHandler) } } catch {}
+                Confirm-ExitPrompt
+                exit 0
+            }
+
             Start-Sleep -Seconds 1
         }
     }
-    catch {
-        # Ctrl+C was pressed
-    }
     finally {
-        & $cleanupBlock
-        Confirm-ExitPrompt
+        try { if ($cancelHandler) { [Console]::remove_CancelKeyPress($cancelHandler) } } catch {}
+        if (-not $didCleanup) {
+            & $cleanupBlock
+            Confirm-ExitPrompt
+        }
     }
 } else {
     Write-ColorOutput "ERROR: Could not get tunnel URL within $Timeout seconds" -Color Red
@@ -733,4 +763,3 @@ if ($url -and $url.Trim()) {
     if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
         if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
 }
-

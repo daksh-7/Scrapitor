@@ -74,7 +74,5 @@ goto launch
 
 :launch
 
-REM Launch PowerShell in a separate window and close this batch to avoid
-REM the "Terminate batch job (Y/N)?" prompt on close.
 start "" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
 exit /b 0
