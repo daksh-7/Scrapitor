@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""Minimal, rule-driven parser for character logs.
-
-Implements exactly these rules:
-1) Convert literal "\n" sequences to real line breaks.
-2) Remove JSON/role metadata entirely.
-3) Remove blocks for tags listed in an omit list (blacklist), case-insensitive.
-   The omit list is configurable via CLI presets or prompts.
-4) From the first system message, take the first non-skipped XML-like tag as the
-   character name. Put its content under a heading of that name; omit all user
-   messages; include the first assistant message content under the heading
-   "First Message".
-5) Include the content of <Scenario>…</Scenario> from the first system message
-   in the final output (if present and not already included), after applying the
-   same removals.
-6) Save as <Character Name>.txt next to the source JSON.
-
-Presets / interaction:
-- Default preset performs a normal parse and does not omit any tags.
-- If running interactively without the default preset, you may choose which tags
-  to remove (blacklist) or, optionally, to include-only (whitelist). In
-  non-interactive contexts (e.g., launched by the proxy), the default preset is
-  applied automatically to avoid blocking.
-"""
 from __future__ import annotations
 
 import argparse
