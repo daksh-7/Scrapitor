@@ -38,7 +38,7 @@ Prefer the shortest path? Jump to [Casual Usage](#casual-usage).
 
 ```
 ./
-└── JanDown
+└── Scrapitor
     ├── app
     │   ├── parser
     │   │   ├── __init__.py
@@ -60,20 +60,20 @@ Prefer the shortest path? Jump to [Casual Usage](#casual-usage).
     └── run.bat
 ```
 
-Runtime directories are created under `JanDown/app/var/`:
+Runtime directories are created under `Scrapitor/app/var/`:
 
-- Logs: `JanDown/app/var/logs/` (JSON logs) and `JanDown/app/var/logs/parsed/<json_stem>/` (TXT exports)
-- State: `JanDown/app/var/state/` (e.g., `tunnel_url.txt`, `parser_settings.json`)
+- Logs: `Scrapitor/app/var/logs/` (JSON logs) and `Scrapitor/app/var/logs/parsed/<json_stem>/` (TXT exports)
+- State: `Scrapitor/app/var/state/` (e.g., `tunnel_url.txt`, `parser_settings.json`)
 
 
 ## Quick Start (Windows)
 
-1) Double-click `JanDown\run.bat`.
+1) Double-click `Scrapitor\run.bat`.
 
 The launcher will:
 
 - Ensure PowerShell 7 is available (offers to install if missing).
-- Create a local virtual environment `JanDown/app/.venv` and install `requirements.txt`.
+- Create a local virtual environment `Scrapitor/app/.venv` and install `requirements.txt`.
 - Start the Flask server on the configured port (default 5000) and verify health.
 - Install or download `cloudflared` if needed, start a tunnel, and print the public URL.
 - Open both the dashboard (local and Cloudflare) in your browser.
@@ -85,7 +85,7 @@ Copy the “JanitorAI API URL” shown in the console or the UI (it ends with `/
 
 If you just want to use scrapitor with JanitorAI quickly:
 
-1) Run `JanDown\run.bat` and wait until “SUCCESS! Proxy is running”.
+1) Run `Scrapitor\run.bat` and wait until “SUCCESS! Proxy is running”.
 2) In the dashboard “Setup” section, copy the “Cloudflare Endpoint” and the “Model Name Preset”.
 3) Follow the steps in [Usage in Janitor](#usage-in-janitor) to wire JanitorAI to your Cloudflare endpoint.
 4) Send a message in JanitorAI; your request appears in “Activity”.
@@ -125,7 +125,7 @@ Prerequisites
 Setup
 
 ```
-cd JanDown/app
+cd Scrapitor/app
 python -m venv .venv
 .venv\Scripts\pip install --upgrade pip
 .venv\Scripts\pip install -r requirements.txt
@@ -168,7 +168,7 @@ The parser is designed for Janitor/character logs and implements these rules:
 5) Include `<Scenario>…</Scenario>` from the first system message if present (subject to the same filters).
 6) Save as `<Character Name>.txt` (server uses a per-request version suffix like `.v3.txt`).
 
-CLI usage (`JanDown/app/parser/parser.py`):
+CLI usage (`Scrapitor/app/parser/parser.py`):
 
 ```
 # Default parse (no removals), auto-writes next to each JSON
@@ -266,7 +266,7 @@ Notes:
 
 ## Configuration
 
-You can configure via environment variables or an optional `config.yaml` in `JanDown/app/`.
+You can configure via environment variables or an optional `config.yaml` in `Scrapitor/app/`.
 
 Environment variables (selected):
 
@@ -329,7 +329,7 @@ security:
 - Run locally without the launcher:
 
 ```
-cd JanDown/app
+cd Scrapitor/app
 python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\python -m app.server
 ```
