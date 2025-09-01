@@ -614,7 +614,7 @@ if ($url -and $url.Trim()) {
         if (Test-Path $tunnelLogErr) {
             Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue
         }
-        $tunnelFile = Join-Path $PSScriptRoot 'var\state\tunnel_url.txt'
+        $tunnelFile = Join-Path $StateDir 'tunnel_url.txt'
         if (Test-Path $tunnelFile) { Remove-Item $tunnelFile -Force -ErrorAction SilentlyContinue }
         if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
         if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
