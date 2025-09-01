@@ -68,11 +68,16 @@ Runtime directories are created under `Scrapitor/app/var/`:
 
 ## Quick Start (Windows)
 
+Prerequisite: PowerShell 7 (`pwsh`). If you don't have it, install with:
+
+```powershell
+winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+```
+
 1) Double-click `Scrapitor\run.bat`.
 
 The launcher will:
 
-- Ensure PowerShell 7 is available (offers to install if missing).
 - Create a local virtual environment `Scrapitor/app/.venv` and install `requirements.txt`.
 - Start the Flask server on the configured port (default 5000) and verify health.
 - Install or download `cloudflared` if needed, start a tunnel, and print the public URL.
@@ -313,6 +318,7 @@ security:
 ## Troubleshooting
 
 - No Cloudflare URL appears: Ensure `cloudflared` is installed and not blocked by firewall. The launcher can install it via `winget` or download the latest release.
+- Script exits with "PowerShell 7 is required": Install PowerShell 7 with the winget command above, then re-run `run.bat`.
 - Port already in use: Set `PROXY_PORT` to a free port, or stop the conflicting process.
 - 502 from OpenRouter: Verify your `Authorization` is present in the request or set `OPENROUTER_API_KEY` on the server.
 - CORS/Browser errors: The server is permissive by default; ensure your client is calling the Cloudflare URL as shown in the UI.
