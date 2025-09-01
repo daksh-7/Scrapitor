@@ -18,7 +18,7 @@ try:
     import yaml  # optional; config.yaml support
 except Exception:
     yaml = None  # type: ignore
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template_string, render_template
+from flask import Flask, Response, jsonify, request, stream_with_context, render_template_string, render_template, send_from_directory
 from flask_cors import CORS
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -701,6 +701,35 @@ def create_app() -> Flask:
             "version": "2.0",
             "config": {"port": LISTEN_PORT},
         })
+
+    # Static convenience routes for favicons/manifest at the site root
+    @app.route("/favicon.ico")
+    def favicon_root():
+        try:
+            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "favicon.ico")
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return resp
+        except Exception:
+            return "", 404
+
+    @app.route("/apple-touch-icon.png")
+    def apple_touch_icon_root():
+        try:
+            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "apple-touch-icon.png")
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return resp
+        except Exception:
+            return "", 404
+
+    @app.route("/site.webmanifest")
+    def webmanifest_root():
+        try:
+            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "site.webmanifest")
+            resp.headers["Content-Type"] = "application/manifest+json"
+            resp.headers["Cache-Control"] = "public, max-age=604800"
+            return resp
+        except Exception:
+            return jsonify({"error": "manifest not found"}), 404
 
     return app
 

@@ -3,22 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}JanitorAI Proxy{% endblock %}</title>
+    <title>{% block title %}Scrapitor{% endblock %}</title>
     <meta name="theme-color" content="#0b0f14" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+    <link rel="manifest" href="{{ url_for('static', filename='assets/site.webmanifest') }}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='assets/apple-touch-icon.png') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='assets/favicon-32x32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='assets/favicon-16x16.png') }}" />
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico') }}" />
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='assets/android-chrome-192x192.png') }}" />
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='assets/android-chrome-512x512.png') }}" />
+    <meta name="application-name" content="Scrapitor" />
+    <meta name="apple-mobile-web-app-title" content="Scrapitor" />
+    <meta name="msapplication-TileColor" content="#0b0f14" />
     {% block head %}{% endblock %}
   </head>
   <body>
     <div class="noise" aria-hidden="true"></div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Sidebar">
-        <div class="brand" aria-label="JanitorAI Proxy - Local OpenRouter Gateway">
-          <div class="logo-icon" aria-hidden="true">🧹</div>
+        <div class="brand" aria-label="Scrapitor - Local OpenRouter Gateway">
+          <div class="logo-icon" aria-hidden="true">
+            <img class="logo-img" src="{{ url_for('static', filename='assets/logo.png') }}" alt="Scrapitor logo" />
+          </div>
           <div class="brand-meta">
-            <div class="brand-title">JanitorAI Proxy</div>
+            <div class="brand-title">Scrapitor</div>
             <div class="brand-sub">Local OpenRouter Gateway</div>
           </div>
         </div>

@@ -183,7 +183,9 @@ body::before {
   width: 48px;
   height: 48px;
   min-width: 48px;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  background: linear-gradient(180deg, 
+    rgba(22, 24, 28, 0.8) 0%, 
+    rgba(15, 17, 20, 0.9) 100%);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -196,6 +198,16 @@ body::before {
   position: relative;
   overflow: hidden;
   transition: all 0.3s var(--ease-expo);
+}
+
+.logo-icon .logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  /* Blend the black areas of the PNG into the sidebar background */
+  mix-blend-mode: screen;
+  filter: brightness(1.15) contrast(1.2);
 }
 
 .logo-icon::before {
