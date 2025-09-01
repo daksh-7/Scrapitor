@@ -124,6 +124,11 @@ Use these six steps inside JanitorAI’s UI (exactly as shown in the app):
 - Click "using proxy"; under "proxy", add a configuration and name it anything.
 - For model name, paste: `mistralai/mistral-small-3.2-24b-instruct:free`
 - Paste the Cloudflare URL (copied above) under "Proxy URL."
+- Enter your OpenRouter API key in the "API Key" section. If you don't have an OpenRouter API Key, follow these steps:
+  - Log in to [openrouter.ai](https://openrouter.ai).
+  - Click your profile picture (top-right) and open "Keys".
+  - Click "Create API Key".
+  - Copy the key.
 - Click "Save changes" then "Save Settings" and refresh the page.
 - Enter any sample message (e.g., "hi"); the app will then receive the model data.
 

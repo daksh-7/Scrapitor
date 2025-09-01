@@ -75,6 +75,19 @@
       <li>Click "using proxy"; under "proxy", add a configuration and name it anything.</li>
       <li>For model name, paste: <code>mistralai/mistral-small-3.2-24b-instruct:free</code></li>
       <li>Paste the Cloudflare URL (copied above) under "Proxy URL."</li>
+      <li>
+        Enter your OpenRouter API
+        <span class="inline-help-anchor">key
+          <button type="button" class="help-badge" onclick="toggleHelp('openrouterApiHelp', this)" aria-expanded="false" aria-controls="openrouterApiHelp" title="How to get API key">?</button>
+        </span>&nbsp;&nbsp;
+        in the "API Key" section.
+        <div id="openrouterApiHelp" class="help-pop" aria-hidden="true">
+          To get an API key: log in to
+          <a href="https://openrouter.ai" target="_blank" rel="noreferrer noopener">openrouter.ai</a>,
+          navigate to <strong>Keys</strong> under the profile picture circle at the top right corner,
+          click <strong>Create API Key</strong>, and copy it.
+        </div>
+      </li>
       <li>Click "Save changes" then "Save Settings" and refresh the page.</li>
       <li>Enter any sample message (e.g., "hi"); the app will then receive the model data.</li>
     </ol>

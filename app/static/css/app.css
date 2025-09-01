@@ -1107,6 +1107,56 @@ textarea:focus {
   text-decoration: underline;
 }
 
+/* Inline help anchor keeps badge positioned without affecting word spacing */
+.inline-help-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+.help-badge {
+  position: absolute;
+  top: -0.9em;
+  right: -1.1em;
+  width: 1.35em;
+  height: 1.35em;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  line-height: 1.35em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+  box-shadow: var(--shadow-xs);
+  z-index: 2;
+}
+
+.help-badge:hover {
+  border-color: var(--border-interactive);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.help-pop {
+  display: none;
+  margin-top: var(--space-sm);
+  color: var(--text-tertiary);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow-sm);
+  transform-origin: top left;
+}
+
+.help-pop.show {
+  display: block;
+  animation: fadeInScale 0.2s var(--ease-expo);
+}
+
 .modal {
   position: fixed;
   inset: 0;

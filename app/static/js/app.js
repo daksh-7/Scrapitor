@@ -1516,6 +1516,35 @@ window.addTagFromInput = () => {
 };
 window.refreshAll = () => uiController.refreshAll();
 
+// Lightweight visibility toggle for inline help blocks
+window.toggleVisibilityById = (id, btn) => {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const isHidden = el.style.display === 'none' || getComputedStyle(el).display === 'none';
+    el.style.display = isHidden ? 'block' : 'none';
+    if (btn && btn.setAttribute) btn.setAttribute('aria-expanded', String(isHidden));
+  } catch (_) {}
+};
+
+// Popover-style toggle with aria-hidden control and animation classes
+window.toggleHelp = (id, btn) => {
+  try {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const hidden = el.getAttribute('aria-hidden') !== 'false';
+    if (!hidden) {
+      el.setAttribute('aria-hidden', 'true');
+      el.classList.remove('show');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    } else {
+      el.setAttribute('aria-hidden', 'false');
+      el.classList.add('show');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+  } catch (_) {}
+};
+
 
 let navigationController, dataManager, parserController, uiController;
 
