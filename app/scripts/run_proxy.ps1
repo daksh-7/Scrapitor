@@ -179,7 +179,7 @@ Write-ColorOutput "Runtime dirs ready ($LogsDir, $StateDir)" -Color Cyan
 
 # Draw header
 Write-Host ""
-Write-ColorOutput "====== JanitorAI Local Proxy ======" -Color Yellow
+Write-ColorOutput "====== Janitor Local Proxy ======" -Color Yellow
 Write-Host ""
 
 # Resolve Python (prefer local venv, then py, then python)
