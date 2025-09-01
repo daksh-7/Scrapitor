@@ -68,11 +68,15 @@ Runtime directories are created under `Scrapitor/app/var/`:
 
 ## Quick Start (Windows)
 
-Prerequisite: PowerShell 7 (`pwsh`). If you don't have it, install with:
+Prerequisites:
+
+- PowerShell 7 (`pwsh`). If you don't have it, install with:
 
 ```powershell
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
 ```
+
+- Python 3.10+ in PATH. Download for Windows: https://www.python.org/downloads/ (During setup, enable "Add python.exe to PATH").
 
 1) Double-click `Scrapitor\run.bat`.
 

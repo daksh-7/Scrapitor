@@ -27,6 +27,27 @@ function Write-ColorOutput {
     Write-Host @params
 }
 
+# Resolve a usable Python interpreter without triggering Windows Store stubs
+function Get-UsablePython {
+    param(
+        [Parameter(Mandatory = $true)][string]$VenvPython
+    )
+    if (Test-Path $VenvPython) { return $VenvPython }
+
+    $pyCmd = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyCmd -and $pyCmd.Source -and ($pyCmd.Source -notmatch 'WindowsApps')) { return 'py' }
+    $pyCmdExe = Get-Command py.exe -ErrorAction SilentlyContinue
+    if ($pyCmdExe -and $pyCmdExe.Source -and ($pyCmdExe.Source -notmatch 'WindowsApps')) { return 'py' }
+
+    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCmd -and $pythonCmd.Source -and ($pythonCmd.Source -notmatch 'WindowsApps')) { return $pythonCmd.Source }
+
+    $python3Cmd = Get-Command python3 -ErrorAction SilentlyContinue
+    if ($python3Cmd -and $python3Cmd.Source -and ($python3Cmd.Source -notmatch 'WindowsApps')) { return $python3Cmd.Source }
+
+    return $null
+}
+
 # Read a yes/no answer, accepting y/n/yes/no in any case
 function Read-YesNo {
     param(
@@ -182,32 +203,23 @@ Write-Host ""
 Write-ColorOutput "====== Janitor Local Proxy ======" -Color Yellow
 Write-Host ""
 
-# Resolve Python (prefer local venv, then py, then python)
+# Resolve Python (prefer local venv, then py, then real python; avoid Windows Store stubs)
 $VenvPython   = Join-Path $AppRoot ".venv\Scripts\python.exe"
 $VenvPythonW  = Join-Path $AppRoot ".venv\Scripts\pythonw.exe"
 $PidFile      = Join-Path $StateDir 'pids.txt'
 $AttachChildrenToConsole = $true  # when true, children die with window close more reliably
-$UsePython = $null
-
-if (Test-Path $VenvPython) {
-    $UsePython = $VenvPython
-} else {
-    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyLauncher) {
-        $UsePython = "py"
-    } else {
-        $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-        if ($pythonCmd) { $UsePython = "python" }
-    }
-}
+$UsePython = Get-UsablePython -VenvPython $VenvPython
 
 if (-not $UsePython) {
-    Write-ColorOutput "ERROR: Python is not installed or not in PATH" -Color Red
-    Write-Host "Install Python: https://www.python.org/downloads/"
-    exit 1
+    Write-ColorOutput "Python is not installed or not available on PATH." -Color Red
+    Write-Host "Download Python (Windows): https://www.python.org/downloads/"
+    Write-Host "Important: During setup, enable 'Add python.exe to PATH'."
+    Write-Host "After installing, re-run Scrapitor using run.bat."
+    Confirm-ExitPrompt
+    return
 }
 
-# Ensure virtualenv exists
+# Ensure virtualenv exists (only after we confirmed Python is present)
 if (-not (Test-Path $VenvPython)) {
     Write-ColorOutput "Creating virtual environment (.venv)..." -Color Cyan
     $VenvPath = Join-Path $AppRoot '.venv'
@@ -218,7 +230,8 @@ if (-not (Test-Path $VenvPython)) {
     }
     if (-not (Test-Path $VenvPython)) {
         Write-ColorOutput "ERROR: Failed to create virtual environment" -Color Red
-        exit 1
+        Confirm-ExitPrompt
+        return
     }
 }
 
