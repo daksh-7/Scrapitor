@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+**/.venv/
+
+# Environments & local config
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs and runtime state
+*.log
+*.tmp
+*.temp
+logs/
+var/logs/
+var/state/
+app/var/logs/
+app/var/state/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node (in case front-end tooling is added later)
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

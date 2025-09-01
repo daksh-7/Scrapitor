@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% block title %}JanitorAI Proxy{% endblock %}
+{% block content %}
+  <section id="overview" class="section" aria-labelledby="overview-title">
+    <h2 id="overview-title" class="section-header">Overview</h2>
+    <div class="metrics-grid">
+      <div class="metric-card" aria-live="polite">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Total Requests</div>
+            <div class="metric-value" id="requestCount">0</div>
+            <div class="metric-label">Since startup</div>
+          </div>
+          <div class="metric-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Server Port</div>
+            <div class="metric-value">{{ port }}</div>
+            <div class="metric-label">Listening on</div>
+          </div>
+          <div class="metric-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+              <rect x="9" y="9" width="6" height="6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup" class="section" aria-labelledby="setup-title">
+    <h2 id="setup-title" class="section-header">Setup</h2>
+    <div class="parameter-grid">
+      <div class="parameter-card">
+        <div class="parameter-header">
+          <span class="parameter-name">Model Name Preset</span>
+        </div>
+        <div class="input-group">
+          <input type="text" class="copy-input" id="modelPreset" value="mistralai/mistral-small-3.2-24b-instruct:free" readonly aria-label="Model Name Preset" />
+          <button class="button button-secondary" onclick="copyText('modelPreset')" aria-label="Copy model name">Copy</button>
+        </div>
+        <div class="metric-label" style="margin-top:.5rem">Use this in JanitorAI "Model name"</div>
+      </div>
+      <div class="parameter-card">
+        <div class="parameter-header">
+          <span class="parameter-name">Cloudflare Endpoint</span>
+        </div>
+        <div class="input-group">
+          <input type="text" class="copy-input" id="endpointCloudflare" value="Detecting…" readonly aria-label="Cloudflare Endpoint" />
+          <button class="button" onclick="copyText('endpointCloudflare')" aria-label="Copy Cloudflare Endpoint">Copy</button>
+        </div>
+        <div class="metric-label" style="margin-top:.5rem">Public URL via cloudflared</div>
+      </div>
+      <div class="parameter-card">
+        <div class="parameter-header">
+          <span class="parameter-name">Local Endpoint</span>
+        </div>
+        <div class="input-group">
+          <input type="text" class="copy-input" id="endpointLocal" value="Detecting…" readonly aria-label="Local Endpoint" />
+          <button class="button button-secondary" onclick="copyText('endpointLocal')" aria-label="Copy Local Endpoint">Copy</button>
+        </div>
+        <div class="metric-label" style="margin-top:.5rem">Direct URL (this machine)</div>
+      </div>
+    </div>
+    <ol class="setup-steps">
+      <li>Initiate a chat with the desired character on JanitorAI.</li>
+      <li>Click "using proxy"; under "proxy", add a configuration and name it anything.</li>
+      <li>For model name, paste: <code>mistralai/mistral-small-3.2-24b-instruct:free</code></li>
+      <li>Paste the Cloudflare URL (copied above) under "Proxy URL."</li>
+      <li>Click "Save changes" then "Save Settings" and refresh the page.</li>
+      <li>Enter any sample message (e.g., "hi"); the app will then receive the model data.</li>
+    </ol>
+  </section>
+
+  <section id="parser" class="section" aria-labelledby="parser-title">
+    <h2 id="parser-title" class="section-header">Parser</h2>
+    <div class="parameter-grid">
+      <div class="parameter-card">
+        <div class="parameter-header">
+          <span class="parameter-name">Mode</span>
+          <span class="parameter-value" id="parser_mode_val">-</span>
+        </div>
+        <div class="mode-group">
+          <label class="mode-pill"><input type="radio" name="parser_mode" value="default"> Default</label>
+          <label class="mode-pill"><input type="radio" name="parser_mode" value="custom"> Custom</label>
+        </div>
+        <div class="metric-label" style="margin-top:.5rem;">
+          <strong>Default</strong>: no tag filtering; writes character content, Scenario (if present), and First Message. <strong>Custom</strong>: use chips to Include/Exclude; if any tags are Included, only those are written.
+        </div>
+      </div>
+      <div class="parameter-card" id="tagControls" style="display:none;">
+        <div class="parameter-header">
+          <span class="parameter-name">Tags</span>
+          <div style="display:flex; gap:0.5rem;">
+            <button id="toggleAllBtn" class="button button-secondary" onclick="toggleAllTags()">Select All</button>
+            <button class="button button-secondary" onclick="clearAllTags()">Clear All</button>
+            <button class="button button-secondary" onclick="detectTagsLatest()">Detect Tags (Latest)</button>
+            <button class="button button-secondary" onclick="detectTagsFromLogs()">Detect Tags (From Logs…)</button>
+          </div>
+        </div>
+        <div class="input-group" style="margin-top:0.5rem;">
+          <input id="newTagInput" class="copy-input" placeholder="Add tag and press Enter" aria-label="New tag name">
+          <button class="button" onclick="addTagFromInput()" aria-label="Add tag">Add</button>
+        </div>
+        <div id="tagChips" class="chips" style="margin-top:0.75rem;"></div>
+      </div>
+    </div>
+    <div style="margin-top:1rem; display:flex; gap:1rem;">
+      <button class="button" onclick="saveParserSettings()">Save Parser Settings</button>
+      <button class="button button-secondary" onclick="openWriteOptions()">Write</button>
+    </div>
+  </section>
+
+  <section id="activity" class="section" aria-labelledby="activity-title">
+    <h2 id="activity-title" class="section-header">Activity</h2>
+    <div class="input-group" style="margin-bottom:.8rem;">
+      <input id="logFilter" class="copy-input" placeholder="Filter logs by name…" aria-label="Filter logs by name">
+      <button class="button button-secondary" onclick="refreshAll()" aria-label="Refresh logs">Refresh</button>
+    </div>
+    <div id="selectionToolbar" class="input-group" style="margin-bottom:.8rem; display:none;">
+      <button id="toggleSelectAllBtn" class="button button-secondary" onclick="toggleSelectAllLogs()">Select All</button>
+      <button class="button" onclick="rewriteSelectedLogs()">Write Selected</button>
+      <button class="button button-secondary" onclick="cancelLogSelection()">Cancel</button>
+    </div>
+    <div class="logs-container" id="logs">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        <p>Waiting for requests...</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="logModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-backdrop" onclick="closeModal()" aria-hidden="true"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Log</div>
+        <div class="modal-actions">
+          <button id="modalBackBtn" class="button button-secondary" onclick="modalBack()" aria-label="Back" style="display:none;">Back</button>
+          <button class="button button-secondary" onclick="copyModal()" aria-label="Copy log content">Copy</button>
+          <button class="button" onclick="closeModal()" aria-label="Close modal">Close</button>
+        </div>
+      </div>
+      <pre class="modal-body" id="modalBody"></pre>
+    </div>
+  </div>
+
+  <div id="writeModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="writeTitle">
+    <div class="modal-backdrop" onclick="closeWriteOptions()" aria-hidden="true"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title" id="writeTitle">Write Options</div>
+        <div class="modal-actions">
+          <button class="button button-secondary" onclick="closeWriteOptions()" aria-label="Close">Close</button>
+        </div>
+      </div>
+      <div class="modal-body" style="white-space:normal;">
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button class="button" onclick="writeLatest()">Write Latest</button>
+          <button class="button button-secondary" onclick="startCustomWriteSelection()">Custom Selection…</button>
+        </div>
+        <div style="margin-top:0.75rem; color:var(--text-tertiary);">
+          Choose Latest to write the most recent JSON, or Custom to select files from Activity.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tagDetectModal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="tagDetectTitle">
+    <div class="modal-backdrop" onclick="closeTagDetect()" aria-hidden="true"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div class="modal-title" id="tagDetectTitle">Detect Tags From Logs</div>
+        <div class="modal-actions">
+          <button class="button button-secondary" onclick="closeTagDetect()" aria-label="Close">Close</button>
+        </div>
+      </div>
+      <div class="modal-body" style="white-space:normal;">
+        <div id="tagDetectList"></div>
+        <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+          <button class="button" onclick="confirmTagDetect()">Detect</button>
+          <button class="button button-secondary" onclick="selectAllTagDetect()">Select All</button>
+          <button class="button button-secondary" onclick="clearAllTagDetect()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
