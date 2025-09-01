@@ -27,6 +27,25 @@ function Write-ColorOutput {
     Write-Host @params
 }
 
+# Verify the "py" launcher has a usable Python installed
+function Test-PyLauncher {
+    try {
+        $out = & py -3 -c "import sys;print(sys.version)" 2>$null
+        return ($LASTEXITCODE -eq 0 -and [string]::IsNullOrWhiteSpace($out) -eq $false)
+    } catch { return $false }
+}
+
+# Verify a given python.exe path is runnable
+function Test-PythonPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$PythonExe
+    )
+    try {
+        $out = & $PythonExe -c "import sys;print(sys.version)" 2>$null
+        return ($LASTEXITCODE -eq 0 -and [string]::IsNullOrWhiteSpace($out) -eq $false)
+    } catch { return $false }
+}
+
 # Resolve a usable Python interpreter without triggering Windows Store stubs
 function Get-UsablePython {
     param(
@@ -35,15 +54,23 @@ function Get-UsablePython {
     if (Test-Path $VenvPython) { return $VenvPython }
 
     $pyCmd = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyCmd -and $pyCmd.Source -and ($pyCmd.Source -notmatch 'WindowsApps')) { return 'py' }
+    if ($pyCmd -and $pyCmd.Source -and ($pyCmd.Source -notmatch 'WindowsApps')) {
+        if (Test-PyLauncher) { return 'py' }
+    }
     $pyCmdExe = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($pyCmdExe -and $pyCmdExe.Source -and ($pyCmdExe.Source -notmatch 'WindowsApps')) { return 'py' }
+    if ($pyCmdExe -and $pyCmdExe.Source -and ($pyCmdExe.Source -notmatch 'WindowsApps')) {
+        if (Test-PyLauncher) { return 'py' }
+    }
 
     $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($pythonCmd -and $pythonCmd.Source -and ($pythonCmd.Source -notmatch 'WindowsApps')) { return $pythonCmd.Source }
+    if ($pythonCmd -and $pythonCmd.Source -and ($pythonCmd.Source -notmatch 'WindowsApps')) {
+        if (Test-PythonPath -PythonExe $pythonCmd.Source) { return $pythonCmd.Source }
+    }
 
     $python3Cmd = Get-Command python3 -ErrorAction SilentlyContinue
-    if ($python3Cmd -and $python3Cmd.Source -and ($python3Cmd.Source -notmatch 'WindowsApps')) { return $python3Cmd.Source }
+    if ($python3Cmd -and $python3Cmd.Source -and ($python3Cmd.Source -notmatch 'WindowsApps')) {
+        if (Test-PythonPath -PythonExe $python3Cmd.Source) { return $python3Cmd.Source }
+    }
 
     return $null
 }
