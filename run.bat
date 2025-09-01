@@ -74,6 +74,7 @@ goto launch
 
 :launch
 
-REM Run in the same console so only one window is shown. Keep open on errors via the script itself.
-"%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
-exit /b %ERRORLEVEL%
+REM Launch PowerShell in a separate window and close this batch to avoid
+REM the "Terminate batch job (Y/N)?" prompt on close.
+start "" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
+exit /b 0
