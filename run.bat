@@ -4,7 +4,6 @@ REM Run from this script's directory
 cd /d "%~dp0"
 
 REM Optional: Update repo if Git is available and this is a git clone
-set "REPO_DIR=%~dp0"
 set "HAS_GIT=0"
 where git >nul 2>nul
 if not errorlevel 1 (
@@ -14,12 +13,12 @@ if not errorlevel 1 (
 if "%HAS_GIT%"=="1" (
   if exist ".git" (
     echo Updating Scrapitor from origin...
-    git -C "%REPO_DIR%" fetch --all --tags --prune
+    git fetch --all --tags --prune
     if errorlevel 1 (
       echo Git fetch failed. Proceeding without updating.
     ) else (
-      git -C "%REPO_DIR%" pull --rebase --autostash
-      if errorlevel 1 echo Git pull failed (local changes or connectivity). Proceeding without updating.
+      git pull --rebase --autostash
+      if errorlevel 1 echo Git pull failed ^(local changes or connectivity^). Proceeding without updating.
     )
   ) else (
     echo This folder is not a Git clone. To receive updates automatically, use Git:
@@ -36,6 +35,8 @@ REM Target script path
 set "SCRIPT=%~dp0app\scripts\run_proxy.ps1"
 if not exist "%SCRIPT%" (
   echo ERROR: Cannot find PowerShell script at "%SCRIPT%"
+  echo.
+  pause
   exit /b 1
 )
 
@@ -45,14 +46,16 @@ set "HAS_PWSH=0"
 if exist "%ProgramFiles%\PowerShell\7\pwsh.exe" (
   set "POWERSHELL=%ProgramFiles%\PowerShell\7\pwsh.exe"
   set "HAS_PWSH=1"
-) else if exist "%ProgramFiles%\PowerShell\7-preview\pwsh.exe" (
-  set "POWERSHELL=%ProgramFiles%\PowerShell\7-preview\pwsh.exe"
-  set "HAS_PWSH=1"
 ) else (
-  where pwsh.exe >nul 2>nul
-  if not errorlevel 1 (
-    set "POWERSHELL=pwsh.exe"
+  if exist "%ProgramFiles%\PowerShell\7-preview\pwsh.exe" (
+    set "POWERSHELL=%ProgramFiles%\PowerShell\7-preview\pwsh.exe"
     set "HAS_PWSH=1"
+  ) else (
+    where pwsh.exe >nul 2>nul
+    if not errorlevel 1 (
+      set "POWERSHELL=pwsh.exe"
+      set "HAS_PWSH=1"
+    )
   )
 )
 
