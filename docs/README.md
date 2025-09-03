@@ -56,6 +56,9 @@ If you prefer the shortest path, jump to [Casual Usage](#casual-usage).
     │   ├── __init__.py
     │   ├── requirements.txt
     │   └── server.py
+    ├── docker
+    │   └── Dockerfile
+    ├── docker-compose.yml
     ├── .gitignore
     └── run.bat
 ```
@@ -100,6 +103,51 @@ The launcher will:
 - Open both the dashboard (local and Cloudflare) in your browser.
 
 Copy the “JanitorAI API URL” shown in the console or the UI (it ends with `/openrouter-cc`). You will use it in JanitorAI’s proxy settings.
+
+
+## Docker (Installation and Usage)
+
+Fastest cross-platform path with Docker.
+
+Prerequisites:
+
+- Docker Desktop installed and running.
+
+Run with Docker Compose:
+
+```
+docker compose up --build
+```
+
+What happens:
+
+- Builds the image using `docker/Dockerfile`.
+- Starts the Flask server inside the container and launches a Cloudflare tunnel using `cloudflared`.
+- Persists runtime data under `app/var/` on your host so the dashboard can read `tunnel_url.txt` and data is kept across restarts.
+- Provides a TryCloudflare URL; it is also saved to `app/var/state/tunnel_url.txt`.
+
+Manual Docker compose commands:
+
+```
+docker compose up --build
+docker compose down
+docker compose up
+```
+
+After launch, copy the Cloudflare endpoint shown and proceed to [Usage in Janitor](#usage-in-janitor).
+
+
+### Directory Structure additions for Docker
+
+```
+./
+└── Scrapitor
+    ├── app
+    ├── docker
+    │   └── Dockerfile
+    ├── docker-compose.yml
+    └── run.bat
+```
 
 
 ## Casual Usage

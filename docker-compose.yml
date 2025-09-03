@@ -1,0 +1,31 @@
+services:
+  scrapitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: scrapitor:latest
+    container_name: scrapitor
+    environment:
+      - PROXY_PORT=5000
+      # Optional upstream/OpenRouter tuning
+      # - OPENROUTER_API_KEY=
+      # - OPENROUTER_URL=https://openrouter.ai/api/v1/chat/completions
+      # - ALLOWED_ORIGINS=*
+      # - CONNECT_TIMEOUT=5.0
+      # - READ_TIMEOUT=300.0
+      # - MAX_LOG_FILES=1000
+      # Optional: tweak cloudflared behavior (defaults set in entrypoint)
+      # - CLOUDFLARED_FLAGS=--edge-ip-version 4 --protocol http2
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app/var:/app/var
+      # If you have a custom config, uncomment the line below:
+      # - ./app/config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    init: true
