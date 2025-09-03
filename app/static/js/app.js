@@ -1,574 +1,669 @@
-const AppState = {
+// Centralized DOM cache to avoid repeated queries
+const DOM = {};
+const initDOMCache = () => {
+  const ids = [
+    'requestCount', 'logs', 'logFilter', 'modalTitle', 'modalBody', 'logModal',
+    'endpointCloudflare', 'endpointLocal', 'openCloudflareBtn', 'openLocalBtn',
+    'notification', 'parser_mode_val', 'tagControls', 'tagChips', 'newTagInput',
+    'toggleAllBtn', 'selectionToolbar', 'toggleSelectAllBtn', 'modalBackBtn',
+    'tagDetectModal', 'tagDetectList', 'writeModal', 'refreshBtn', 'toggleSidebarBtn',
+    'toggleDensityBtn'
+  ];
+  ids.forEach(id => { DOM[id] = document.getElementById(id); });
+};
+
+// Centralized state with cleaner structure
+const State = {
   includeSet: new Set(),
   excludeSet: new Set(),
   allTags: new Set(),
   logs: [],
-  isLoading: false,
-  refreshInterval: null,
-  toggleAllState: 'select',
-  loadingTimer: null,
+  selectedLogs: new Set(),
+  selectingLogs: false,
+  tagToFilesLower: {},
   tagDetectScope: [],
-  tagDetectScopeOriginal: [],
-  tagToFilesLower: {}
+  refreshTimer: null,
+  caches: {
+    json: new Map(),
+    parsedList: new Map(),
+    parsedContent: new Map()
+  }
 };
 
 const Config = {
   REFRESH_INTERVAL: 5000,
   NOTIFICATION_DURATION: 3000,
   DEBOUNCE_DELAY: 300,
-  MAX_LOGS_DISPLAY: 100 
+  MAX_LOGS: 100,
+  CACHE_LIMITS: { json: 50, parsedContent: 80 }
 };
 
-
-// Lightweight, consistent error + fetch helpers
-const Err = {
-  info(message) {
-    try { console.info(message); } catch (_) {}
-    try { notifications.show(String(message), 'info'); } catch (_) {}
-  },
-  warn(message) {
-    try { console.warn(message); } catch (_) {}
-    try { notifications.show(String(message), 'warning'); } catch (_) {}
-  },
-  error(message, err) {
-    try { console.error(message, err || ''); } catch (_) {}
-    try { notifications.show(String(message), 'error'); } catch (_) {}
-  }
+// Unified error handler
+const handleError = (message, error = null) => {
+  console.error(message, error);
+  notifications.show(message, 'error');
 };
 
-const Http = {
-  async getJson(url) {
+// Simplified fetch wrapper
+const api = {
+  async get(url) {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    return res;
+  },
+  async getJson(url) {
+    return (await this.get(url)).json();
   },
   async getText(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.text();
+    return (await this.get(url)).text();
+  },
+  async post(url, data) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || 'Request failed');
+    }
+    return res.json();
   }
 };
 
-
-/**
- * Debounce function for performance
- */
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
-/**
- * Smooth scroll to element
- */
-const smoothScrollTo = (element) => {
-  element.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-    inline: 'nearest'
+// Simplified element creator
+const createElement = (tag, attrs = {}, children = []) => {
+  const el = document.createElement(tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
   });
+  children.forEach(c => c && el.appendChild(c));
+  return el;
 };
 
-/**
- * Format numbers with commas
- */
-const formatNumber = (num) => {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+// Unified animation utility
+const animate = {
+  pulse(el) {
+    el.classList.add('pulse-once');
+    setTimeout(() => el.classList.remove('pulse-once'), 600);
+  },
+  scale(el, temp = true) {
+    el.style.transform = 'scale(1.1)';
+    if (temp) setTimeout(() => { el.style.transform = ''; }, 200);
+  },
+  fadeIn(el, className = 'fade-in') {
+    el.classList.add(className);
+  },
+  spin(el, duration = 500) {
+    el.classList.add('spinning');
+    setTimeout(() => el.classList.remove('spinning'), duration);
+  }
 };
 
-/**
- * Animate number counter
- */
-const animateCounter = (element, start, end, duration) => {
-  const range = end - start;
-  const increment = end > start ? 1 : -1;
-  const stepTime = Math.abs(Math.floor(duration / range));
-  let current = start;
+// Simplified cache manager
+class CacheManager {
+  constructor(limit) {
+    this.cache = new Map();
+    this.limit = limit;
+  }
   
-  const timer = setInterval(() => {
-    current += increment;
-    element.textContent = formatNumber(current);
-    
-    if (current === end) {
-      clearInterval(timer);
-      element.classList.add('pulse-once');
-      setTimeout(() => element.classList.remove('pulse-once'), 600);
+  set(key, value) {
+    if (this.cache.has(key)) this.cache.delete(key);
+    this.cache.set(key, value);
+    while (this.cache.size > this.limit) {
+      this.cache.delete(this.cache.keys().next().value);
     }
-  }, stepTime);
-};
+    return value;
+  }
+  
+  get(key) { return this.cache.get(key); }
+  has(key) { return this.cache.has(key); }
+  delete(key) { this.cache.delete(key); }
+  clear() { this.cache.clear(); }
+}
 
-
+// Simplified notification manager
 class NotificationManager {
   constructor() {
     this.queue = [];
-    this.isShowing = false;
+    this.showing = false;
   }
   
   show(message, type = 'success') {
     this.queue.push({ message, type });
-    this.processQueue();
+    if (!this.showing) this.processNext();
   }
   
-  processQueue() {
-    if (this.isShowing || this.queue.length === 0) return;
-    
-    this.isShowing = true;
+  processNext() {
+    if (!this.queue.length) return;
+    this.showing = true;
     const { message, type } = this.queue.shift();
     
-    const notification = document.getElementById('notification');
-    const messageEl = notification.querySelector('.notification-message');
-    const iconEl = notification.querySelector('.notification-icon');
+    if (!DOM.notification) return;
+    const msgEl = DOM.notification.querySelector('.notification-message');
+    const iconEl = DOM.notification.querySelector('.notification-icon');
     
-    messageEl.textContent = message;
+    if (msgEl) msgEl.textContent = message;
+    if (iconEl) {
+      iconEl.style.color = `var(--accent-${type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'primary'})`;
+    }
     
-    const icons = {
-      success: '<path d="M9 11l4 4 8-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-      error: '<path d="M6 6l12 12M6 18L18 6" stroke-width="2" stroke-linecap="round"/>',
-      info: '<path d="M12 2v10m0 4v2m0 0a1 1 0 100-2 1 1 0 000 2z" stroke-width="2"/>',
-      warning: '<path d="M12 8v4m0 4h.01" stroke-width="2" stroke-linecap="round"/>'
-    };
-    
-    iconEl.innerHTML = icons[type] || icons.success;
-
-    // Dynamic coloring by type
-    const colorMap = {
-      success: 'var(--accent-success)',
-      error: 'var(--accent-danger)',
-      warning: 'var(--accent-warning)',
-      info: 'var(--accent-primary)'
-    };
-    iconEl.style.color = colorMap[type] || colorMap.success;
-    notification.dataset.type = type;
-    
-    notification.style.borderColor = type === 'error' ? 'var(--accent-danger)' : 
-                                     type === 'warning' ? 'var(--accent-warning)' : 
-                                     'var(--border-interactive)';
-    
-    notification.classList.add('show');
-    
+    DOM.notification.classList.add('show');
     setTimeout(() => {
-      notification.classList.remove('show');
-      this.isShowing = false;
-      
-      setTimeout(() => this.processQueue(), 300);
+      DOM.notification.classList.remove('show');
+      this.showing = false;
+      setTimeout(() => this.processNext(), 300);
     }, Config.NOTIFICATION_DURATION);
   }
 }
 
 const notifications = new NotificationManager();
 
+// Utility functions
+const debounce = (fn, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+};
 
-async function copyText(id) {
-  const element = document.getElementById(id);
-  if (!element) return;
-  
-  const value = element.value || element.textContent || '';
-  
-  try {
-    await navigator.clipboard.writeText(String(value));
-    
-    element.classList.add('copied');
-    setTimeout(() => element.classList.remove('copied'), 1000);
-    
-    notifications.show('Copied to clipboard', 'success');
-  } catch (err) {
-    try {
-      const range = document.createRange();
-      range.selectNode(element);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand('copy');
-      selection.removeAllRanges();
-      
-      notifications.show('Copied to clipboard', 'success');
-    } catch (fallbackErr) {
-      notifications.show('Failed to copy', 'error');
-    }
-  }
-}
+const formatNumber = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const getRelativeTime = () => new Date().toTimeString().slice(0, 5);
+const escapeHtml = text => {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
 
-
-class NavigationController {
+// Simplified Modal class
+class Modal {
   constructor() {
-    this.sections = [...document.querySelectorAll('section')];
-    this.navItems = [...document.querySelectorAll('.nav-item')];
-    this.activeSection = null;
-    
-    this.init();
+    this.el = DOM.logModal;
+    this.title = DOM.modalTitle;
+    this.body = DOM.modalBody;
+    this.backBtn = DOM.modalBackBtn;
   }
   
-  init() {
-    this.navItems.forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const targetId = item.getAttribute('href').slice(1);
-        const targetSection = document.getElementById(targetId);
-        
-        if (targetSection) {
-          smoothScrollTo(targetSection);
-          this.setActive(item);
-        }
-      });
-    });
+  show(title, content, isHtml = false) {
+    if (!this.el || !this.title || !this.body) return;
     
-    window.addEventListener('scroll', debounce(() => this.updateActiveOnScroll(), 50), { passive: true });
-    
-    this.updateActiveOnScroll();
-  }
-  
-  updateActiveOnScroll() {
-    const scrollPosition = window.scrollY + 120;
-    let currentSection = this.sections[0];
-    
-    for (const section of this.sections) {
-      if (section.offsetTop <= scrollPosition) {
-        currentSection = section;
+    this.title.textContent = title;
+    if (isHtml) {
+      this.body.innerHTML = content;
+    } else {
+      this.body.textContent = content;
+      if (content.trim().match(/^[\[{]/)) {
+        try {
+          const parsed = JSON.parse(content);
+          this.body.innerHTML = this.syntaxHighlight(JSON.stringify(parsed, null, 2));
+        } catch {}
       }
     }
     
-    const activeItem = this.navItems.find(item => 
-      item.getAttribute('href') === `#${currentSection.id}`
-    );
-    
-    if (activeItem) {
-      this.setActive(activeItem);
+    this.el.style.display = 'flex';
+    requestAnimationFrame(() => this.el.classList.add('show'));
+  }
+  
+  hide() {
+    if (!this.el) return;
+    this.el.classList.remove('show');
+    this.el.style.display = 'none';
+  }
+  
+  setBack(handler) {
+    if (!this.backBtn) return;
+    if (handler) {
+      this.backBtn.style.display = '';
+      this.backBtn.onclick = e => { e.preventDefault(); handler(); };
+    } else {
+      this.backBtn.style.display = 'none';
+      this.backBtn.onclick = null;
     }
   }
   
-  setActive(item) {
-    this.navItems.forEach(navItem => {
-      navItem.classList.remove('active');
-      navItem.style.transform = '';
-      navItem.removeAttribute('aria-current');
-    });
-    
-    item.classList.add('active');
-    item.setAttribute('aria-current', 'page');
-    
-    item.style.transform = 'scale(1.05)';
-    setTimeout(() => {
-      item.style.transform = '';
-    }, 200);
+  syntaxHighlight(json) {
+    return json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, 
+        match => {
+          let cls = 'number';
+          if (/^"/.test(match)) cls = /:$/.test(match) ? 'key' : 'string';
+          else if (/true|false/.test(match)) cls = 'boolean';
+          else if (/null/.test(match)) cls = 'null';
+          return `<span class="json-${cls}">${match}</span>`;
+        });
   }
 }
 
-
+// Main data manager (simplified)
 class DataManager {
   constructor() {
-    this.logJsonCache = new Map();           // name -> raw JSON text
-    this.parsedListCache = new Map();        // name -> parsed list response
-    this.parsedContentCache = new Map();     // `${name}|${id}` -> text
-    this._prefetchTimer = null;
+    this.jsonCache = new CacheManager(Config.CACHE_LIMITS.json);
+    this.parsedListCache = new CacheManager(100);
+    this.parsedContentCache = new CacheManager(Config.CACHE_LIMITS.parsedContent);
   }
+  
   async updateStats(silent = false) {
     try {
-      AppState.isLoading = true;
-      if (!silent) this.showLoadingState();
-      
-      const data = await Http.getJson('/logs');
-      
+      const data = await api.getJson('/logs');
       const total = data.total || 0;
-      const requestCountEl = document.getElementById('requestCount');
       
-      if (requestCountEl) {
-        const currentValue = parseInt(requestCountEl.textContent.replace(/,/g, '') || '0');
-        if (currentValue !== total) {
-          animateCounter(requestCountEl, currentValue, total, 500);
+      if (DOM.requestCount) {
+        const current = parseInt(DOM.requestCount.textContent.replace(/,/g, '') || '0');
+        if (current !== total) {
+          this.animateCounter(DOM.requestCount, current, total);
         }
       }
       
-      const logs = data.logs || [];
-      this.renderLogs(logs, !silent);
-      // Prefetch common actions for snappier first-open
-      this.schedulePrefetch(logs);
-      
+      State.logs = data.logs || [];
+      this.renderLogs(!silent);
+      // Opportunistic prefetch to make first opens instant
+      this.schedulePrefetch(State.logs);
     } catch (error) {
-      Err.error('Failed to load data', error);
-    } finally {
-      AppState.isLoading = false;
-      if (!silent) this.hideLoadingState();
+      handleError('Failed to load data', error);
     }
   }
   
-  renderLogs(logs, animate = false) {
-    AppState.logs = logs;
-    const filterVal = (document.getElementById('logFilter')?.value || '').toLowerCase().trim();
-    const logsContainer = document.getElementById('logs');
-    if (!logsContainer) return;
-
-    const filtered = logs.filter(name => !filterVal || name.toLowerCase().includes(filterVal))
-      .slice(0, Config.MAX_LOGS_DISPLAY);
-    if (filtered.length === 0) {
-      this.renderEmptyState(logsContainer);
+  animateCounter(el, start, end, duration = 500) {
+    const range = Math.abs(end - start);
+    if (range === 0) {
+      el.textContent = formatNumber(end);
+      animate.pulse(el);
       return;
     }
-
-    logsContainer.innerHTML = '';
-    filtered.forEach((name, idx) => {
-      const el = this._createLogItem(name, animate ? idx : null);
-      logsContainer.appendChild(el);
-    });
-  }
-
-  _createEl(tag, attrs = {}, children = []) {
-    const el = document.createElement(tag);
-    Object.entries(attrs).forEach(([k, v]) => {
-      if (k === 'class') el.className = v;
-      else if (k === 'text') el.textContent = v;
-      else if (k === 'html') el.innerHTML = v;
-      else el.setAttribute(k, v);
-    });
-    children.forEach(c => { if (c) el.appendChild(c); });
-    return el;
-  }
-
-  _createLogItem(name, animIndex) {
-    const item = this._createEl('div', { class: 'log-item' });
-    item.dataset.name = name;
-    if (animIndex !== null) item.style.animationDelay = `${animIndex * 20}ms`;
-
-    if (AppState.selectingLogs) {
-      const leftSpan = this._createEl('span', { class: 'log-filename', text: name });
-      const time = this._createEl('span', { class: 'log-time', text: this.getRelativeTime() });
-      item.appendChild(leftSpan); item.appendChild(time);
-      item.classList.add('selectable');
-      if (AppState.selectedLogs && AppState.selectedLogs.has(name)) {
-        item.classList.add('active'); item.setAttribute('aria-selected', 'true');
+    const increment = end > start ? 1 : -1;
+    const stepTime = Math.max(10, Math.floor(duration / range));
+    let current = start;
+    const timer = setInterval(() => {
+      current += increment;
+      el.textContent = formatNumber(current);
+      if (current === end) {
+        clearInterval(timer);
+        animate.pulse(el);
       }
-      item.addEventListener('click', (e) => this.toggleLogSelection(e, name, item));
+    }, stepTime);
+  }
+  
+  renderLogs(animated = false) {
+    if (!DOM.logs) return;
+    
+    const filter = (DOM.logFilter?.value || '').toLowerCase();
+    const filtered = State.logs.filter(name => !filter || name.toLowerCase().includes(filter))
+      .slice(0, Config.MAX_LOGS);
+    
+    if (!filtered.length) {
+      DOM.logs.innerHTML = '<div class="empty-state"><p>Waiting for requests...</p></div>';
+      return;
+    }
+    
+    DOM.logs.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    
+    filtered.forEach((name, i) => {
+      const item = this.createLogItem(name, animated ? i : null);
+      fragment.appendChild(item);
+    });
+    
+    DOM.logs.appendChild(fragment);
+  }
+
+  // Render from a provided list (used for selection filtering)
+  renderLogsFrom(list, animated = false) {
+    if (!DOM.logs) return;
+    const filtered = (list || []).slice(0, Config.MAX_LOGS);
+    if (!filtered.length) {
+      DOM.logs.innerHTML = '<div class="empty-state"><p>Waiting for requests...</p></div>';
+      return;
+    }
+    DOM.logs.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    filtered.forEach((name, i) => {
+      const item = this.createLogItem(name, animated ? i : null);
+      fragment.appendChild(item);
+    });
+    DOM.logs.appendChild(fragment);
+  }
+  
+  createLogItem(name, animIndex) {
+    const item = createElement('div', { 
+      class: 'log-item',
+      'data-name': name
+    });
+    
+    if (animIndex !== null) {
+      item.style.animationDelay = `${animIndex * 20}ms`;
+      animate.fadeIn(item, 'fade-in-up');
+    }
+    
+    if (State.selectingLogs) {
+      const span = createElement('span', { class: 'log-filename', text: name });
+      const time = createElement('span', { class: 'log-time', text: getRelativeTime() });
+      item.appendChild(span);
+      item.appendChild(time);
+      item.classList.add('selectable');
+      
+      if (State.selectedLogs.has(name)) {
+        item.classList.add('active');
+      }
+      
+      item.onclick = e => this.toggleLogSelection(e, name, item);
       return item;
     }
-
-    const left = this._createEl('div', { class: 'log-left' });
-    const nameSpan = this._createEl('span', { class: 'log-filename', text: name });
-    const txtBtn = this._createEl('button', { class: 'mini-btn mini-txt-btn loud', title: 'View parsed TXT', 'aria-label': `View parsed TXT for ${name}` });
-    txtBtn.textContent = 'TXT';
-    const rnBtn = this._createEl('button', { class: 'icon-btn mini-rename-btn', title: 'Rename log', 'aria-label': `Rename ${name}` });
-    rnBtn.textContent = '✎';
-    left.appendChild(nameSpan); left.appendChild(txtBtn); left.appendChild(rnBtn);
-    const time = this._createEl('span', { class: 'log-time', text: this.getRelativeTime() });
-    item.appendChild(left); item.appendChild(time);
-
-    item.addEventListener('click', (ev) => {
-      if (item.querySelector('.inline-rename')) { try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {} return; }
-      this.openLog(name);
+    
+    const left = createElement('div', { class: 'log-left' });
+    const nameSpan = createElement('span', { class: 'log-filename', text: name });
+    const txtBtn = createElement('button', { 
+      class: 'mini-btn mini-txt-btn loud',
+      text: 'TXT',
+      onclick: e => { e.stopPropagation(); this.openParsedList(name); }
     });
-    const stopAll = (e) => { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} };
-    txtBtn.addEventListener('pointerdown', stopAll, { passive: false });
-    txtBtn.addEventListener('mousedown', stopAll, { passive: false });
-    txtBtn.addEventListener('click', (e) => { stopAll(e); this.openParsedList(name); }, { passive: false });
-
-    rnBtn.addEventListener('pointerdown', stopAll, { passive: false });
-    rnBtn.addEventListener('mousedown', stopAll, { passive: false });
-    rnBtn.addEventListener('click', (e) => this._startInlineRename(e, item, name));
-    if (animIndex !== null) item.classList.add('fade-in-up');
+    const renameBtn = createElement('button', {
+      class: 'icon-btn mini-rename-btn',
+      text: '✎',
+      onclick: e => this.startInlineRename(e, item, name)
+    });
+    
+    left.appendChild(nameSpan);
+    left.appendChild(txtBtn);
+    left.appendChild(renameBtn);
+    
+    const time = createElement('span', { class: 'log-time', text: getRelativeTime() });
+    item.appendChild(left);
+    item.appendChild(time);
+    
+    item.onclick = () => this.openLog(name);
     return item;
   }
+  
+  toggleLogSelection(e, name, el) {
+    e.stopPropagation();
+    if (State.selectedLogs.has(name)) {
+      State.selectedLogs.delete(name);
+      el.classList.remove('active');
+    } else {
+      State.selectedLogs.add(name);
+      el.classList.add('active');
+    }
+    this.updateSelectionToolbar();
+  }
+  
+  updateSelectionToolbar() {
+    if (!DOM.selectionToolbar) return;
+    DOM.selectionToolbar.style.display = State.selectingLogs ? 'flex' : 'none';
+    
+    if (DOM.toggleSelectAllBtn) {
+      const count = State.selectedLogs.size;
+      const total = State.logs.length;
+      DOM.toggleSelectAllBtn.textContent = count === total ? 'Deselect All' : 'Select All';
+    }
+  }
+  
+  async openLog(name) {
+    const modal = new Modal();
+    const cached = this.jsonCache.get(name);
+    
+    if (cached) {
+      modal.show(name, cached);
+    } else {
+      modal.show(name, 'Loading…');
+    }
+    
+    try {
+      const content = await api.getText(`/logs/${encodeURIComponent(name)}`);
+      this.jsonCache.set(name, content);
+      modal.show(name, content);
+    } catch (error) {
+      if (!cached) handleError('Failed to load log', error);
+    }
+  }
+  
+  async openParsedList(name) {
+    try {
+      let data = this.parsedListCache.get(name);
+      if (!data) {
+        data = await api.getJson(`/logs/${encodeURIComponent(name)}/parsed`);
+        this.parsedListCache.set(name, data);
+      }
+      
+      const versions = data.versions || [];
+      if (!versions.length) {
+        notifications.show('No parsed TXT versions yet', 'info');
+        return;
+      }
+      
+      const modal = new Modal();
+      const content = createElement('div', { class: 'version-picker' }, [
+        createElement('div', { class: 'version-header', text: 'Parsed TXT Versions' }),
+        createElement('ul', { class: 'version-list' }, 
+          versions.map(v => this.createVersionItem(name, v, data.latest))
+        )
+      ]);
+      
+      modal.show(`${name} — TXT`, '', true);
+      DOM.modalBody.innerHTML = '';
+      DOM.modalBody.appendChild(content);
+      modal.setBack(() => this.openParsedList(name));
 
-  async _startInlineRename(e, item, name) {
+      // Prefetch all listed parsed contents to make first click instant
+      try {
+        const ids = versions.map(v => v.file);
+        await this.prefetchParsedContentList(name, ids);
+      } catch (e) { /* noop */ }
+      
+    } catch (error) {
+      handleError('Failed to load parsed versions', error);
+    }
+  }
+  
+  createVersionItem(logName, version, latest) {
+    const isLatest = latest && version.file === latest;
+    const meta = `${isLatest ? 'Latest ' : ''}${this.formatDate(version.mtime)} • ${Math.max(1, Math.round((version.size || 0) / 1024))} KB`;
+    
+    return createElement('li', {}, [
+      createElement('div', { class: 'version-left' }, [
+        createElement('button', {
+          class: 'version-item',
+          text: version.file,
+          onclick: () => this.openParsedContent(logName, version.file)
+        }),
+        createElement('button', {
+          class: 'icon-btn version-rename',
+          text: '✎',
+          onclick: e => this.renameParsedFile(e, logName, version.file)
+        })
+      ]),
+      createElement('span', { class: 'meta', text: meta })
+    ]);
+  }
+  
+  async openParsedContent(name, id) {
+    const modal = new Modal();
+    const key = `${name}|${id}`;
+    const cached = this.parsedContentCache.get(key);
+    
+    const title = `${name} — ${id}`;
+    modal.show(title, cached || 'Loading…');
+    modal.setBack(() => this.openParsedList(name));
+    
+    if (!cached) {
+      try {
+        const text = await api.getText(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
+        this.parsedContentCache.set(key, text);
+        modal.show(title, text);
+      } catch (error) {
+        handleError('Failed to load parsed content', error);
+      }
+    }
+  }
+  
+  async startInlineRename(e, item, name) {
     e.stopPropagation();
     const left = item.querySelector('.log-left');
     if (!left || left.querySelector('.inline-rename')) return;
-    const nameSpan = left.querySelector('.log-filename');
-    const txtButton = left.querySelector('.mini-txt-btn');
-    const pencil = left.querySelector('.mini-rename-btn');
-    if (nameSpan) nameSpan.style.display = 'none';
-    if (txtButton) txtButton.style.display = 'none';
-    if (pencil) pencil.style.display = 'none';
-    const wrap = this._createEl('div', { class: 'inline-rename' });
-    const input = this._createEl('input', { class: 'copy-input rename-input' }); input.value = name; input.style.flex = '1';
-    const cancelBtn = this._createEl('button', { class: 'button button-secondary', text: 'Cancel' });
-    const saveBtn = this._createEl('button', { class: 'button', text: 'Save' });
-    wrap.appendChild(input); wrap.appendChild(cancelBtn); wrap.appendChild(saveBtn); left.appendChild(wrap);
-    setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 0);
-    const cleanup = () => { try { left.removeChild(wrap); } catch (_) {}; if (nameSpan) nameSpan.style.display = ''; if (txtButton) txtButton.style.display = ''; if (pencil) pencil.style.display = ''; };
-    const stopAll = (ev) => { try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {} };
-    cancelBtn.addEventListener('click', (ev) => { stopAll(ev); cleanup(); });
-    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); saveBtn.click(); } if (ev.key === 'Escape') { ev.preventDefault(); cancelBtn.click(); } }, { passive: false });
-    saveBtn.addEventListener('click', async (ev) => {
-      stopAll(ev);
-      const newName = (input.value || '').trim();
-      if (!newName || newName === name) { cleanup(); return; }
-      try {
-        const res = await fetch(`/logs/${encodeURIComponent(name)}/rename`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ new_name: newName }) });
-        if (res.ok) {
-          notifications.show('Log renamed', 'success');
-          dataManager.clearParsedCachesFor(name);
-          await dataManager.updateStats();
-        } else {
-          const err = await res.json().catch(() => ({}));
-          Err.error(err.error || 'Rename failed');
+    
+    const elements = {
+      name: left.querySelector('.log-filename'),
+      txt: left.querySelector('.mini-txt-btn'),
+      rename: left.querySelector('.mini-rename-btn')
+    };
+    
+    Object.values(elements).forEach(el => el && (el.style.display = 'none'));
+    
+    const wrap = createElement('div', { class: 'inline-rename' });
+    const input = createElement('input', { 
+      class: 'copy-input rename-input',
+      value: name,
+      style: 'flex:1'
+    });
+    
+    const cleanup = () => {
+      left.removeChild(wrap);
+      Object.values(elements).forEach(el => el && (el.style.display = ''));
+    };
+    
+    wrap.appendChild(input);
+    wrap.appendChild(createElement('button', {
+      class: 'button button-secondary',
+      text: 'Cancel',
+      onclick: cleanup
+    }));
+    wrap.appendChild(createElement('button', {
+      class: 'button',
+      text: 'Save',
+      onclick: async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === name) {
+          cleanup();
+          return;
         }
-      } catch (err) {
-        Err.error('Rename failed', err);
-      } finally {
+        try {
+          await api.post(`/logs/${encodeURIComponent(name)}/rename`, { new_name: newName });
+          notifications.show('Log renamed', 'success');
+          this.clearCachesFor(name);
+          await this.updateStats();
+        } catch (error) {
+          handleError(error.message);
+        }
         cleanup();
       }
-    });
+    }));
+    
+    left.appendChild(wrap);
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    
+    input.onkeydown = e => {
+      if (e.key === 'Enter') wrap.querySelector('.button:not(.button-secondary)').click();
+      if (e.key === 'Escape') wrap.querySelector('.button-secondary').click();
+    };
+  }
+  
+  async renameParsedFile(e, logName, fileName) {
+    e.stopPropagation();
+    const newName = prompt('New name:', fileName);
+    if (!newName || newName === fileName) return;
+    
+    try {
+      await api.post(`/logs/${encodeURIComponent(logName)}/parsed/rename`, {
+        old: fileName,
+        new: newName
+      });
+      notifications.show('File renamed', 'success');
+      this.clearCachesFor(logName);
+      this.openParsedList(logName);
+    } catch (error) {
+      handleError(error.message);
+    }
+  }
+  
+  clearCachesFor(name) {
+    this.parsedListCache.delete(name);
+    this.jsonCache.delete(name);
+    const prefix = `${name}|`;
+    [...this.parsedContentCache.cache.keys()]
+      .filter(k => k.startsWith(prefix))
+      .forEach(k => this.parsedContentCache.delete(k));
+  }
+  
+  formatDate(unixSeconds) {
+    if (!unixSeconds) return '';
+    return new Date(unixSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  }
+  
+  async updateEndpoints(silent = false) {
+    let cloudflareUrl = '';
+    let localUrl = 'http://localhost:5000/openrouter-cc';
+    
+    try {
+      const { url } = await api.getJson('/tunnel');
+      cloudflareUrl = url ? `${url}/openrouter-cc` : '';
+    } catch {}
+    
+    try {
+      const { config } = await api.getJson('/health');
+      localUrl = `http://localhost:${config?.port || 5000}/openrouter-cc`;
+    } catch {}
+    
+    if (DOM.endpointCloudflare) {
+      DOM.endpointCloudflare.value = cloudflareUrl || 'Not available';
+      if (!silent) animate.pulse(DOM.endpointCloudflare);
+    }
+    
+    if (DOM.endpointLocal) {
+      DOM.endpointLocal.value = localUrl;
+      if (!silent) animate.pulse(DOM.endpointLocal);
+    }
+    
+    if (DOM.openCloudflareBtn) {
+      DOM.openCloudflareBtn.style.pointerEvents = cloudflareUrl ? 'auto' : 'none';
+      DOM.openCloudflareBtn.style.opacity = cloudflareUrl ? '1' : '0.5';
+      DOM.openCloudflareBtn.href = cloudflareUrl || '#';
+    }
+    
+    if (DOM.openLocalBtn) {
+      DOM.openLocalBtn.href = localUrl.replace('/openrouter-cc', '/');
+    }
   }
 
-  async openParsedList(name, useCache = true) {
-    try {
-      let data;
-      if (useCache && this.parsedListCache.has(name)) {
-        data = this.parsedListCache.get(name);
-      } else {
-        const res = await fetch(`/logs/${encodeURIComponent(name)}/parsed`);
-        if (!res.ok) throw new Error('Failed to fetch parsed versions');
-        data = await res.json();
-        this.parsedListCache.set(name, data);
-      }
-      const versions = Array.isArray(data.versions) ? data.versions : [];
-      if (!versions.length) {
-        notifications.show('No parsed TXT versions for this log yet', 'info');
-        return;
-      }
-
-      const modal = new Modal();
-      modal.showHtml(`${name} — TXT`, '');
-      modal.setBackHandler(null);
-
-      const bodyEl = document.getElementById('modalBody');
-      if (bodyEl) {
-        // Build list via DOM APIs
-        const picker = this._createEl('div', { class: 'version-picker' });
-        picker.appendChild(this._createEl('div', { class: 'version-header', text: 'Parsed TXT Versions' }));
-        const listEl = this._createEl('ul', { class: 'version-list' });
-        versions.forEach(v => {
-          const li = this._createEl('li');
-          const left = this._createEl('div', { class: 'version-left' });
-          const vlabel = (v.version && Number.isInteger(v.version)) ? `v${v.version}` : '';
-          const btn = this._createEl('button', { class: 'version-item', 'data-id': v.file });
-          btn.textContent = vlabel ? `${vlabel} · ${v.file}` : v.file;
-          const rn = this._createEl('button', { class: 'icon-btn version-rename', title: 'Rename parsed file', 'data-id': v.file }); rn.textContent = '✎';
-          left.appendChild(btn); left.appendChild(rn);
-          const meta = this._createEl('span', { class: 'meta' });
-          const latestText = (data.latest && v.file === data.latest) ? 'Latest ' : '';
-          const date = this.formatDateTime(v.mtime);
-          const sizeKb = Math.max(1, Math.round((v.size || 0) / 1024));
-          meta.textContent = `${latestText}${date} • ${sizeKb} KB`;
-          li.appendChild(left); li.appendChild(meta);
-          listEl.appendChild(li);
-        });
-        picker.appendChild(listEl);
-        bodyEl.innerHTML = '';
-        bodyEl.appendChild(picker);
-
-        // Prefetch parsed content for listed versions to make first click instant
-        try {
-          const ids = versions.map(v => v.file);
-          this.prefetchParsedContentList(name, ids);
-        } catch (_) {}
-
-        bodyEl.querySelectorAll('.version-item').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            const id = btn.getAttribute('data-id');
-            if (!id) return;
-            const title = `${name} — ${id}`;
-            const cacheKey = `${name}|${id}`;
-            const cached = this.parsedContentCache.get(cacheKey);
-            if (cached) {
-              modal.show(title, cached);
-              modal.setBackHandler(() => { this.openParsedList(name, true); });
-            } else {
-              modal.show(title, 'Loading…');
-              modal.setBackHandler(() => { this.openParsedList(name, true); });
-            }
-            try {
-              const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
-              if (!r.ok) throw new Error('Failed to load parsed content');
-              const text = await r.text();
-              this.parsedContentCache.set(cacheKey, text);
-              modal.show(title, text);
-              modal.setBackHandler(() => { this.openParsedList(name, true); });
-            } catch (err) {
-              if (!cached) notifications.show('Failed to load parsed content', 'error');
-            }
-          });
-        });
-        bodyEl.querySelectorAll('.version-rename').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            if (!id) return;
-            // Replace the button row with inline rename controls
-            const parentLi = btn.closest('li');
-            if (!parentLi) return;
-            const left = parentLi.querySelector('.version-left');
-            if (!left) return;
-            if (left.querySelector('.inline-rename')) return;
-            const nameBtn = left.querySelector('.version-item');
-            const pencil = btn;
-            if (nameBtn) nameBtn.style.display = 'none';
-            if (pencil) pencil.style.display = 'none';
-
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-rename';
-            const input = document.createElement('input');
-            input.className = 'copy-input rename-input';
-            input.value = id;
-            input.style.flex = '1';
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'button button-secondary';
-            cancelBtn.textContent = 'Cancel';
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'button';
-            saveBtn.textContent = 'Save';
-            wrap.appendChild(input);
-            wrap.appendChild(cancelBtn);
-            wrap.appendChild(saveBtn);
-            left.appendChild(wrap);
-            setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 0);
-
-            const cleanup = () => {
-              try { left.removeChild(wrap); } catch (_) {}
-              if (nameBtn) nameBtn.style.display = '';
-              if (pencil) pencil.style.display = '';
-            };
-            cancelBtn.addEventListener('click', (ev) => { ev.stopPropagation(); cleanup(); });
-            input.addEventListener('keydown', (ev) => {
-              if (ev.key === 'Enter') { ev.preventDefault(); saveBtn.click(); }
-              if (ev.key === 'Escape') { ev.preventDefault(); cancelBtn.click(); }
-            }, { passive: false });
-            saveBtn.addEventListener('click', async (ev) => {
-              ev.stopPropagation();
-              const newName = (input.value || '').trim();
-              if (!newName || newName === id) { cleanup(); return; }
-              try {
-                const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/rename`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ old: id, new: newName })
-                });
-                if (!r.ok) {
-                  const err = await r.json().catch(() => ({}));
-                  notifications.show(err.error || 'Rename failed', 'error');
-                  return;
-                }
-                notifications.show('Parsed file renamed', 'success');
-                // Clear caches for this log before re-opening
-                dataManager.clearParsedCachesFor(name);
-                this.openParsedList(name, false);
-              } catch (_) {
-                notifications.show('Rename failed', 'error');
-              } finally {
-                cleanup();
-              }
-            });
-          });
-        });
-      }
-    } catch (err) {
-      Err.error('Failed to load parsed versions', err);
+  // Background prefetch to speed up first opens
+  schedulePrefetch(logs) {
+    const run = () => this.prefetchForLogs(logs).catch(() => {});
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(run, { timeout: 300 });
+    } else {
+      setTimeout(run, 50);
     }
+  }
+
+  async prefetchForLogs(logs) {
+    const JSON_COUNT = 10;
+    const LIST_COUNT = 6;
+    const top = (logs || []).slice(0, Math.max(JSON_COUNT, LIST_COUNT));
+    const jsonTasks = top.slice(0, JSON_COUNT).map(name => async () => {
+      if (this.jsonCache.has(name)) return;
+      try {
+        const txt = await api.getText(`/logs/${encodeURIComponent(name)}`);
+        this.jsonCache.set(name, txt);
+      } catch {}
+    });
+    const listTasks = top.slice(0, LIST_COUNT).map(name => async () => {
+      let data = this.parsedListCache.get(name);
+      try {
+        if (!data) {
+          data = await api.getJson(`/logs/${encodeURIComponent(name)}/parsed`);
+          this.parsedListCache.set(name, data);
+        }
+        const latest = data?.latest;
+        if (latest && !this.parsedContentCache.has(`${name}|${latest}`)) {
+          const text = await api.getText(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(latest)}`);
+          this.parsedContentCache.set(`${name}|${latest}`, text);
+        }
+      } catch {}
+    });
+    await this._runLimited([...jsonTasks, ...listTasks], 3);
   }
 
   async prefetchParsedContentList(name, ids) {
@@ -576,504 +671,55 @@ class DataManager {
       const key = `${name}|${id}`;
       if (this.parsedContentCache.has(key)) return;
       try {
-        const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
-        if (!r.ok) return;
-        const text = await r.text();
-        this._setCacheWithLimit(this.parsedContentCache, key, text, 80);
-      } catch (_) {}
+        const text = await api.getText(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
+        this.parsedContentCache.set(key, text);
+      } catch {}
     });
     await this._runLimited(tasks, 3);
   }
 
-  formatDateTime(unixSeconds) {
-    if (!unixSeconds) return '';
-    try {
-      const d = new Date(unixSeconds * 1000);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      const ss = String(d.getSeconds()).padStart(2, '0');
-      return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
-    } catch (_) {
-      return '';
-    }
-  }
-
-  toggleLogSelection(e, name, el) {
-    e.stopPropagation();
-    const set = AppState.selectedLogs;
-    if (set.has(name)) {
-      set.delete(name);
-      el.classList.remove('active');
-    } else {
-      set.add(name);
-      el.classList.add('active');
-    }
-    this.updateSelectionToolbar();
-  }
-
-  updateSelectionToolbar() {
-    const toolbar = document.getElementById('selectionToolbar');
-    if (!toolbar) return;
-    const count = AppState.selectedLogs.size;
-    toolbar.style.display = AppState.selectingLogs ? 'flex' : 'none';
-    const toggleBtn = document.getElementById('toggleSelectAllBtn');
-    if (toggleBtn) {
-      const total = AppState.logs.length;
-      toggleBtn.textContent = count === total ? 'Deselect All' : 'Select All';
-    }
-  }
-  
-  renderEmptyState(container) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 6v6l4 2"/>
-        </svg>
-        <p>Waiting for requests...</p>
-      </div>
-    `;
-  }
-  
-  async openLog(name) {
-    const modal = new Modal();
-    const cached = this.logJsonCache.get(name);
-    if (cached) {
-      modal.show(name, cached);
-    } else {
-      modal.show(name, 'Loading…');
-    }
-    try {
-      const response = await fetch(`/logs/${encodeURIComponent(name)}`);
-      if (!response.ok) throw new Error('Fetch failed');
-      const content = await response.text();
-      this._setCacheWithLimit(this.logJsonCache, name, content, 50);
-      modal.show(name, content);
-    } catch (error) {
-      if (!cached) {
-        Err.error('Failed to load log', error);
-      }
-    }
-  }
-  
-  async updateEndpoints(silent = false) {
-    let cloudflareUrl = '';
-    let localUrl = 'http://localhost:5000/openrouter-cc';
-
-    // Fetch Cloudflare tunnel URL
-    try {
-      const response = await fetch('/tunnel');
-      const data = await response.json();
-      cloudflareUrl = data.url ? `${data.url}/openrouter-cc` : '';
-    } catch (error) {
-      Err.warn('Failed to fetch tunnel URL');
-    }
-
-    // Fetch local server port from /health to avoid using Cloudflare hostname/port
-    try {
-      const healthRes = await fetch('/health');
-      if (healthRes.ok) {
-        const health = await healthRes.json();
-        const port = health?.config?.port || 5000;
-        localUrl = `http://localhost:${port}/openrouter-cc`;
-      }
-    } catch (error) {
-      // Fallback remains http://localhost:5000/openrouter-cc
-    }
-    
-    const cfInput = document.getElementById('endpointCloudflare');
-    const localInput = document.getElementById('endpointLocal');
-    
-    if (cfInput) {
-      if (silent) {
-        cfInput.value = cloudflareUrl || 'Not available';
-      } else {
-        this.updateInputWithAnimation(cfInput, cloudflareUrl || 'Not available');
-      }
-    }
-    
-    if (localInput) {
-      if (silent) {
-        localInput.value = localUrl;
-      } else {
-        this.updateInputWithAnimation(localInput, localUrl);
-      }
-    }
-    
-    const cfButton = document.getElementById('openCloudflareBtn');
-    if (cfButton) {
-      cfButton.style.pointerEvents = cloudflareUrl ? 'auto' : 'none';
-      cfButton.style.opacity = cloudflareUrl ? '1' : '0.5';
-      cfButton.href = cloudflareUrl || '#';
-    }
-    
-    const localButton = document.getElementById('openLocalBtn');
-    if (localButton) {
-      localButton.href = localUrl.replace('/openrouter-cc', '/');
-    }
-  }
-  
-  updateInputWithAnimation(input, value) {
-    if (input.value !== value) {
-      input.classList.add('updating');
-      setTimeout(() => {
-        input.value = value;
-        input.classList.remove('updating');
-      }, 150);
-    }
-  }
-  
-  showLoadingState() {
-    if (AppState.loadingTimer) return;
-    AppState.loadingTimer = setTimeout(() => {
-      document.querySelectorAll('.metric-card, .parameter-card').forEach(card => {
-        card.classList.add('loading');
-      });
-    }, 200);
-  }
-  
-  hideLoadingState() {
-    if (AppState.loadingTimer) {
-      clearTimeout(AppState.loadingTimer);
-      AppState.loadingTimer = null;
-    }
-    document.querySelectorAll('.metric-card, .parameter-card').forEach(card => {
-      card.classList.remove('loading');
-    });
-  }
-  
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-  
-  getRelativeTime() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  }
-  
-  schedulePrefetch(logs) {
-    try { if (this._prefetchTimer) clearTimeout(this._prefetchTimer); } catch (_) {}
-    const run = () => { try { this.prefetchForLogs(logs); } catch (_) {} };
-    if (typeof window !== 'undefined' && window.requestIdleCallback) {
-      window.requestIdleCallback(run, { timeout: 300 });
-    } else {
-      this._prefetchTimer = setTimeout(run, 50);
-    }
-  }
-  
-  async prefetchForLogs(logs) {
-    const JSON_COUNT = 10;
-    const PARSED_LIST_COUNT = 6;
-    const PARSED_CONTENT_PER_LOG = 1;
-    const LIMIT_JSON_CACHE = 50;
-    const LIMIT_PARSED_CONTENT_CACHE = 80;
-
-    const topLogs = (logs || []).slice(0, Math.max(JSON_COUNT, PARSED_LIST_COUNT));
-    const jsonTasks = topLogs.slice(0, JSON_COUNT).map(name => async () => {
-      if (this.logJsonCache.has(name)) return;
-      try {
-        const res = await fetch(`/logs/${encodeURIComponent(name)}`);
-        if (!res.ok) return;
-        const txt = await res.text();
-        this._setCacheWithLimit(this.logJsonCache, name, txt, LIMIT_JSON_CACHE);
-      } catch (_) {}
-    });
-    const listTasks = topLogs.slice(0, PARSED_LIST_COUNT).map(name => async () => {
-      let data = this.parsedListCache.get(name) || null;
-      try {
-        if (!data) {
-          const res = await fetch(`/logs/${encodeURIComponent(name)}/parsed`);
-          if (!res.ok) return;
-          data = await res.json();
-          this.parsedListCache.set(name, data);
-        }
-        const latest = data && data.latest;
-        if (latest && PARSED_CONTENT_PER_LOG > 0) {
-          const key = `${name}|${latest}`;
-          if (!this.parsedContentCache.has(key)) {
-            const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(latest)}`);
-            if (!r.ok) return;
-            const text = await r.text();
-            this._setCacheWithLimit(this.parsedContentCache, key, text, LIMIT_PARSED_CONTENT_CACHE);
-          }
-        }
-      } catch (_) {}
-    });
-    await this._runLimited([...jsonTasks, ...listTasks], 3);
-  }
-  
   async _runLimited(tasks, concurrency = 3) {
     const queue = tasks.slice();
     const workers = new Array(Math.min(concurrency, queue.length)).fill(0).map(async () => {
       while (queue.length) {
         const task = queue.shift();
-        try { await task(); } catch (_) {}
+        try { await task(); } catch {}
       }
     });
     await Promise.all(workers);
   }
-  
-  _setCacheWithLimit(map, key, value, limit) {
-    try {
-      if (map.has(key)) map.delete(key);
-      map.set(key, value);
-      while (map.size > limit) {
-        const firstKey = map.keys().next().value;
-        map.delete(firstKey);
-      }
-    } catch (_) {}
-  }
-
-  clearParsedCachesFor(name) {
-    try { this.parsedListCache.delete(name); } catch (_) {}
-    try {
-      const prefix = `${name}|`;
-      for (const k of Array.from(this.parsedContentCache.keys())) {
-        if (k.startsWith(prefix)) this.parsedContentCache.delete(k);
-      }
-    } catch (_) {}
-  }
 }
 
-
-class Modal {
-  show(title, content) {
-    const modalEl = document.getElementById('logModal');
-    const titleEl = document.getElementById('modalTitle');
-    const bodyEl = document.getElementById('modalBody');
-    
-    if (!modalEl || !titleEl || !bodyEl) return;
-    
-    titleEl.textContent = title;
-    bodyEl.textContent = content;
-    
-    if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-      try {
-        const parsed = JSON.parse(content);
-        bodyEl.innerHTML = this.syntaxHighlight(JSON.stringify(parsed, null, 2));
-      } catch (e) {
-      }
-    }
-    
-    modalEl.style.display = 'flex';
-    
-    // Focus management and keyboard support
-    try {
-      modalEl._prevFocus = document.activeElement || null;
-      const panel = modalEl.querySelector('.modal-panel');
-      const focusable = panel ? panel.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])') : [];
-      const focusables = Array.from(focusable).filter(el => !el.hasAttribute('disabled'));
-      if (focusables.length > 0) {
-        focusables[0].focus();
-      } else if (panel) {
-        panel.setAttribute('tabindex', '-1');
-        panel.focus();
-      }
-      modalEl._keydownHandler = (e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          this.hide();
-          return;
-        }
-        if (e.key === 'Tab') {
-          if (!focusables.length) {
-            e.preventDefault();
-            return;
-          }
-          const first = focusables[0];
-          const last = focusables[focusables.length - 1];
-          if (e.shiftKey) {
-            if (document.activeElement === first) {
-              e.preventDefault();
-              last.focus();
-            }
-          } else {
-            if (document.activeElement === last) {
-              e.preventDefault();
-              first.focus();
-            }
-          }
-        }
-      };
-      document.addEventListener('keydown', modalEl._keydownHandler);
-    } catch (_) {}
-
-    requestAnimationFrame(() => {
-      modalEl.classList.add('show');
-    });
-  }
-  setBackHandler(handler) {
-    const backBtn = document.getElementById('modalBackBtn');
-    if (backBtn) {
-      if (typeof handler === 'function') {
-        backBtn.style.display = '';
-        backBtn.onclick = (e) => { e.preventDefault(); handler(); };
-      } else {
-        backBtn.style.display = 'none';
-        backBtn.onclick = null;
-      }
-    }
-  }
-  showHtml(title, html) {
-    const modalEl = document.getElementById('logModal');
-    const titleEl = document.getElementById('modalTitle');
-    const bodyEl = document.getElementById('modalBody');
-    if (!modalEl || !titleEl || !bodyEl) return;
-    titleEl.textContent = title;
-    bodyEl.innerHTML = html;
-    modalEl.style.display = 'flex';
-    try {
-      modalEl._prevFocus = document.activeElement || null;
-    } catch (_) {}
-    requestAnimationFrame(() => {
-      modalEl.classList.add('show');
-    });
-  }
-  showInlineEditor(title, initial, onSave) {
-    const modalEl = document.getElementById('logModal');
-    const titleEl = document.getElementById('modalTitle');
-    const bodyEl = document.getElementById('modalBody');
-    if (!modalEl || !titleEl || !bodyEl) return;
-    titleEl.textContent = title;
-    bodyEl.innerHTML = `
-      <div style="display:flex; gap:.5rem; align-items:center;">
-        <input id="inlineEditInput" class="copy-input" style="flex:1" value="${this.escapeHtml ? this.escapeHtml(initial) : initial}" />
-        <button class="button" id="inlineEditSave">Save</button>
-        <button class="button button-secondary" id="inlineEditCancel">Cancel</button>
-      </div>
-    `;
-    modalEl.style.display = 'flex';
-    requestAnimationFrame(() => modalEl.classList.add('show'));
-    const saveBtn = document.getElementById('inlineEditSave');
-    const cancelBtn = document.getElementById('inlineEditCancel');
-    const input = document.getElementById('inlineEditInput');
-    if (input) setTimeout(() => input.focus(), 50);
-    const cleanup = () => this.hide();
-    if (cancelBtn) cancelBtn.addEventListener('click', cleanup);
-    if (saveBtn) saveBtn.addEventListener('click', async () => {
-      const val = input ? (input.value || '').trim() : '';
-      if (!val) return;
-      await onSave(val);
-      cleanup();
-    });
-  }
-  
-  hide() {
-    const modalEl = document.getElementById('logModal');
-    if (!modalEl) return;
-    
-    try {
-      if (modalEl._keydownHandler) {
-        document.removeEventListener('keydown', modalEl._keydownHandler);
-        modalEl._keydownHandler = null;
-      }
-    } catch (_) {}
-    
-    modalEl.classList.remove('show');
-    modalEl.style.display = 'none';
-    try {
-      const prev = modalEl._prevFocus;
-      if (prev && typeof prev.focus === 'function') {
-        prev.focus();
-      }
-      modalEl._prevFocus = null;
-    } catch (_) {}
-  }
-  
-  syntaxHighlight(json) {
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
-      let cls = 'number';
-      if (/^"/.test(match)) {
-        if (/:$/.test(match)) {
-          cls = 'key';
-        } else {
-          cls = 'string';
-        }
-      } else if (/true|false/.test(match)) {
-        cls = 'boolean';
-      } else if (/null/.test(match)) {
-        cls = 'null';
-      }
-      return `<span class="json-${cls}">${match}</span>`;
-    });
-  }
-}
-
-
+// Parser controller (simplified)
 class ParserController {
   constructor() {
-    this.init();
-    this._tagDetectSelection = new Set();
-  }
-  
-  init() {
-    this.loadSettings();
-    this.setupEventListeners();
-  }
-  
-  setupEventListeners() {
-    document.querySelectorAll('input[name="parser_mode"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const tagControls = document.getElementById('tagControls');
-        if (tagControls) {
-          const shouldShow = e.target.value === 'custom';
-          
-          if (shouldShow) {
-            tagControls.style.display = 'block';
-            tagControls.classList.add('fade-in');
-          } else {
-            tagControls.classList.remove('fade-in');
-            setTimeout(() => {
-              tagControls.style.display = 'none';
-            }, 300);
-          }
-        }
-        // Immediately update the visible mode label
-        this.updateModeDisplay(e.target.value);
-      });
-    });
+    this.tagDetectSelection = new Set();
   }
   
   async loadSettings() {
     try {
-      const response = await fetch('/parser-settings');
-      const settings = await response.json();
-      
+      const settings = await api.getJson('/parser-settings');
       const mode = settings.mode || 'default';
+      
+      State.includeSet.clear();
+      State.excludeSet = new Set((settings.exclude_tags || []).map(t => t.toLowerCase()));
+      State.allTags.clear();
+      
       this.updateModeDisplay(mode);
-      
-      // Only persist exclusions; do not preload include tags or chips
-      AppState.includeSet = new Set();
-      AppState.excludeSet = new Set((settings.exclude_tags || []).map(t => String(t).toLowerCase()));
-      AppState.allTags = new Set();
-      
-      const tagControls = document.getElementById('tagControls');
-      if (tagControls) {
-        tagControls.style.display = mode === 'custom' ? 'block' : 'none';
+      if (DOM.tagControls) {
+        DOM.tagControls.style.display = mode === 'custom' ? 'block' : 'none';
       }
       
-      // Render (empty until user detects)
       this.renderChips();
-      
     } catch (error) {
-      Err.error('Failed to load parser settings', error);
+      handleError('Failed to load parser settings', error);
     }
   }
   
   updateModeDisplay(mode) {
-    const modeValueEl = document.getElementById('parser_mode_val');
-    if (modeValueEl) {
-      modeValueEl.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
-      modeValueEl.classList.add('pulse-once');
-      setTimeout(() => modeValueEl.classList.remove('pulse-once'), 600);
+    if (DOM.parser_mode_val) {
+      DOM.parser_mode_val.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+      animate.pulse(DOM.parser_mode_val);
     }
     
     document.querySelectorAll('input[name="parser_mode"]').forEach(radio => {
@@ -1082,124 +728,56 @@ class ParserController {
   }
   
   renderChips() {
-    const container = document.getElementById('tagChips');
-    if (!container) return;
+    if (!DOM.tagChips) return;
     
-    container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    const sorted = [...State.allTags].sort();
     
-    const sortedTags = Array.from(AppState.allTags).sort((a, b) => a.localeCompare(b));
-    
-    sortedTags.forEach((tag, index) => {
-      const chip = document.createElement('div');
-      chip.className = 'tag-chip';
-      chip.textContent = tag;
-      chip.title = 'Click to toggle: Include ↔ Exclude';
+    sorted.forEach((tag, i) => {
+      const chip = createElement('div', {
+        class: `tag-chip ${State.includeSet.has(tag) ? 'include' : State.excludeSet.has(tag) ? 'exclude' : ''}`,
+        text: tag,
+        title: 'Click to toggle: Include ↔ Exclude',
+        onclick: () => this.cycleTagState(tag, chip),
+        onmouseenter: () => this.highlightFilesForTag(tag),
+        onmouseleave: () => this.clearFileHighlights()
+      });
       
-      if (AppState.includeSet.has(tag)) {
-        chip.classList.add('include');
-      } else if (AppState.excludeSet.has(tag)) {
-        chip.classList.add('exclude');
-      }
-      
-      chip.addEventListener('click', () => this.cycleTagState(tag, chip));
-      chip.addEventListener('mouseenter', () => this.highlightFilesForTag(tag));
-      chip.addEventListener('mouseleave', () => this.clearFileHighlights());
-      
-      chip.style.animationDelay = `${index * 30}ms`;
-      chip.classList.add('fade-in-scale');
-      
-      container.appendChild(chip);
+      chip.style.animationDelay = `${i * 30}ms`;
+      animate.fadeIn(chip, 'fade-in-scale');
+      fragment.appendChild(chip);
     });
+    
+    DOM.tagChips.innerHTML = '';
+    DOM.tagChips.appendChild(fragment);
   }
   
   cycleTagState(tag, chip) {
-    if (AppState.includeSet.has(tag)) {
-      // switch to exclude
-      AppState.includeSet.delete(tag);
-      AppState.excludeSet.add(tag);
+    if (State.includeSet.has(tag)) {
+      State.includeSet.delete(tag);
+      State.excludeSet.add(tag);
       chip.className = 'tag-chip exclude';
-      this.animateChipChange(chip);
     } else {
-      // switch to include
-      AppState.excludeSet.delete(tag);
-      AppState.includeSet.add(tag);
+      State.excludeSet.delete(tag);
+      State.includeSet.add(tag);
       chip.className = 'tag-chip include';
-      this.animateChipChange(chip);
     }
+    animate.scale(chip);
   }
   
-  animateChipChange(chip) {
-    chip.style.transform = 'scale(1.1)';
-    setTimeout(() => {
-      chip.style.transform = '';
-    }, 200);
-  }
-  
-  addTag(tagName) {
-    const tag = (tagName || '').trim().toLowerCase();
-    if (!tag) return;
+  highlightFilesForTag(tag) {
+    const files = new Set((State.tagToFilesLower[tag.toLowerCase()] || [])
+      .filter(f => !State.tagDetectScope.length || State.tagDetectScope.includes(f)));
     
-    if (!AppState.allTags.has(tag)) {
-      AppState.allTags.add(tag);
-      // Default to exclude
-      AppState.excludeSet.add(tag);
-      this.renderChips();
-      notifications.show(`Added tag: ${tag}`, 'success');
-    } else {
-      notifications.show('Tag already exists', 'info');
-    }
-  }
-  
-  toggleAllTags() {
-    const button = document.getElementById('toggleAllBtn');
-    
-    if (AppState.toggleAllState === 'select') {
-      AppState.includeSet = new Set(AppState.allTags);
-      AppState.excludeSet.clear();
-      AppState.toggleAllState = 'exclude';
-      if (button) button.textContent = 'Exclude All';
-    } else {
-      AppState.excludeSet = new Set(AppState.allTags);
-      AppState.includeSet.clear();
-      AppState.toggleAllState = 'select';
-      if (button) button.textContent = 'Include All';
-    }
-    
-    this.renderChips();
-  }
-  
-  clearAllTags() {
-    AppState.includeSet.clear();
-    AppState.excludeSet = new Set(AppState.allTags);
-    AppState.toggleAllState = 'select';
-    const button = document.getElementById('toggleAllBtn');
-    if (button) button.textContent = 'Select All';
-    this.renderChips();
-    notifications.show('Set all tags to Exclude', 'info');
-  }
-
-  highlightFilesForTag(tagRaw) {
-    const tag = String(tagRaw).toLowerCase();
-    const scope = new Set(AppState.tagDetectScope || []);
-    const filesLower = (AppState.tagToFilesLower && AppState.tagToFilesLower[tag]) || [];
-    let setToHighlight = new Set(filesLower);
-    if (scope.size > 0) {
-      setToHighlight = new Set(filesLower.filter(f => scope.has(f)));
-    }
     document.querySelectorAll('#logs .log-item').forEach(item => {
-      const name = (item.getAttribute('data-name') || '').toLowerCase();
-      if (setToHighlight.has(name)) {
-        item.classList.add('highlight');
-        const fn = item.querySelector('.log-filename');
-        if (fn) fn.style.textDecoration = 'underline';
-      } else {
-        item.classList.remove('highlight');
-        const fn = item.querySelector('.log-filename');
-        if (fn) fn.style.textDecoration = '';
-      }
+      const name = (item.dataset.name || '').toLowerCase();
+      const highlight = files.has(name);
+      item.classList.toggle('highlight', highlight);
+      const fn = item.querySelector('.log-filename');
+      if (fn) fn.style.textDecoration = highlight ? 'underline' : '';
     });
   }
-
+  
   clearFileHighlights() {
     document.querySelectorAll('#logs .log-item').forEach(item => {
       item.classList.remove('highlight');
@@ -1208,632 +786,444 @@ class ParserController {
     });
   }
   
-  async detectTagsLatest() {
+  async detectTags(mode = 'latest', files = null) {
     try {
-      const response = await fetch('/parser-tags?mode=latest');
-      const data = await response.json();
+      const url = mode === 'latest' ? '/parser-tags?mode=latest' : 
+                  `/parser-tags?files=${encodeURIComponent(files.join(','))}`;
+      const data = await api.getJson(url);
       
-      const tags = (data.tags || []).map(t => String(t).toLowerCase());
-      // Replace with only latest tags
-      AppState.allTags = new Set(tags);
-      AppState.allTags.add('first_message');
-
-      // Save mappings for filtering
+      const tags = (data.tags || []).map(t => t.toLowerCase());
+      State.allTags = new Set([...tags, 'first_message']);
+      
       const byTag = data.by_tag || {};
-      const norm = {};
-      Object.keys(byTag).forEach(tag => {
-        norm[tag.toLowerCase()] = (byTag[tag] || []).map(f => String(f).toLowerCase());
-      });
-      AppState.tagToFilesLower = norm;
-      AppState.tagDetectScope = (data.files || []).map(n => String(n).toLowerCase());
-      AppState.tagDetectScopeOriginal = (data.files || []).slice();
+      State.tagToFilesLower = Object.fromEntries(
+        Object.entries(byTag).map(([tag, files]) => [
+          tag.toLowerCase(),
+          files.map(f => f.toLowerCase())
+        ])
+      );
       
-      const tagControls = document.getElementById('tagControls');
-      if (tagControls) {
-        tagControls.style.display = 'block';
-      }
+      State.tagDetectScope = (data.files || []).map(n => n.toLowerCase());
       
+      if (DOM.tagControls) DOM.tagControls.style.display = 'block';
       this.renderChips();
       notifications.show(`Detected ${tags.length} tags`, 'success');
       
     } catch (error) {
-      Err.error('Failed to detect tags', error);
-    }
-  }
-
-  openTagDetectModal() {
-    // Build list from AppState.logs
-    const container = document.getElementById('tagDetectList');
-    const modal = document.getElementById('tagDetectModal');
-    if (!container || !modal) return;
-    this._tagDetectSelection = new Set();
-    const logs = AppState.logs || [];
-    if (!logs.length) {
-      container.innerHTML = '<div class="empty-state"><p>No logs available.</p></div>';
-    } else {
-      const items = logs.map(name => `
-        <label class="detect-item" style="display:block; margin-bottom:6px;">
-          <input type="checkbox" data-name="${this.escapeHtml ? this.escapeHtml(name) : name}"> 
-          <span>${name}</span>
-        </label>
-      `).join('');
-      container.innerHTML = `<div class="detect-list" style="display:block;">${items}</div>`;
-    }
-    modal.style.display = 'flex';
-    requestAnimationFrame(() => modal.classList.add('show'));
-  }
-
-  closeTagDetectModal() {
-    const modal = document.getElementById('tagDetectModal');
-    if (!modal) return;
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-
-  selectAllTagDetect() {
-    const container = document.getElementById('tagDetectList');
-    if (!container) return;
-    container.querySelectorAll('input[type="checkbox"]').forEach(chk => chk.checked = true);
-  }
-
-  clearAllTagDetect() {
-    const container = document.getElementById('tagDetectList');
-    if (!container) return;
-    container.querySelectorAll('input[type="checkbox"]').forEach(chk => chk.checked = false);
-  }
-
-  async confirmTagDetect() {
-    const container = document.getElementById('tagDetectList');
-    if (!container) return;
-    const picked = [];
-    container.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-      if (chk.checked) picked.push(chk.getAttribute('data-name'));
-    });
-    if (!picked.length) {
-      notifications.show('Select at least one log', 'info');
-      return;
-    }
-    try {
-      const q = encodeURIComponent(picked.join(','));
-      const response = await fetch(`/parser-tags?files=${q}`);
-      const data = await response.json();
-      const tags = (data.tags || []).map(t => String(t).toLowerCase());
-      // Replace with tags from selected logs only
-      AppState.allTags = new Set(tags);
-      AppState.allTags.add('first_message');
-      // Save mappings to AppState for exclusive filtering
-      // Normalize mappings to lower-case file names for robust matching
-      const byTag = data.by_tag || {};
-      const norm = {};
-      Object.keys(byTag).forEach(tag => {
-        norm[tag.toLowerCase()] = (byTag[tag] || []).map(f => String(f).toLowerCase());
-      });
-      AppState.tagToFilesLower = norm;
-      AppState.tagDetectScope = (data.files || []).map(n => String(n).toLowerCase());
-      AppState.tagDetectScopeOriginal = (data.files || []).slice();
-      this.renderChips();
-      this.closeTagDetectModal();
-      notifications.show(`Detected ${tags.length} tags`, 'success');
-    } catch (e) {
-      notifications.show('Failed to detect tags', 'error');
+      handleError('Failed to detect tags', error);
     }
   }
   
   async saveSettings() {
-    const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
-      .find(r => r.checked);
-    const mode = modeRadio ? modeRadio.value : 'default';
-    
-    const payload = {
-      mode,
-      // persist exclusions ONLY
-      exclude_tags: Array.from(AppState.excludeSet)
-    };
+    const mode = document.querySelector('input[name="parser_mode"]:checked')?.value || 'default';
     
     try {
-      const response = await fetch('/parser-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      await api.post('/parser-settings', {
+        mode,
+        exclude_tags: [...State.excludeSet]
       });
-      
-      if (response.ok) {
-        notifications.show('Parser settings saved', 'success');
-        await this.loadSettings();
-      } else {
-        notifications.show('Failed to save settings', 'error');
-      }
-      
+      notifications.show('Settings saved', 'success');
+      await this.loadSettings();
     } catch (error) {
-      Err.error('Error saving settings', error);
+      handleError('Failed to save settings', error);
     }
   }
   
-  async rewriteParsed() {
+  async rewrite(mode = 'all', files = null) {
+    const parser_mode = document.querySelector('input[name="parser_mode"]:checked')?.value || 'default';
+    
     try {
-      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
-        .find(r => r.checked);
-      const parser_mode = modeRadio ? modeRadio.value : 'default';
-      const response = await fetch('/parser-rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'all',
-          parser_mode,
-          include_tags: Array.from(AppState.includeSet),
-          exclude_tags: Array.from(AppState.excludeSet)
-        })
-      });
+      const payload = {
+        mode,
+        parser_mode,
+        include_tags: [...State.includeSet],
+        exclude_tags: [...State.excludeSet]
+      };
       
-      if (response.ok) {
-        const data = await response.json();
-        notifications.show(`Rewrote ${data.rewritten} file(s)`, 'success');
-      } else {
-        notifications.show('Rewrite failed', 'error');
+      if (files) payload.files = files;
+      
+      const data = await api.post('/parser-rewrite', payload);
+      notifications.show(`Wrote ${data.rewritten} file(s)`, 'success');
+      
+      if (State.selectingLogs) {
+        State.selectingLogs = false;
+        State.selectedLogs.clear();
+        dataManager.renderLogs();
+        dataManager.updateSelectionToolbar();
       }
       
+      await dataManager.updateStats();
     } catch (error) {
-      Err.error('Error rewriting logs', error);
+      handleError('Rewrite failed', error);
     }
   }
 }
 
-
+// UI Controller (simplified)
 class UIController {
-  constructor() {
-    this.setupEventListeners();
-    this.loadPreferences();
-  }
-  
-  setupEventListeners() {
-    const sidebarToggle = document.getElementById('toggleSidebarBtn');
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', () => this.toggleSidebar());
-    }
-    
-    const densityToggle = document.getElementById('toggleDensityBtn');
-    if (densityToggle) {
-      densityToggle.addEventListener('click', () => this.toggleDensity());
-    }
-    
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', () => this.refreshAll());
-    }
-    
-    const logFilter = document.getElementById('logFilter');
-    if (logFilter) {
-      logFilter.addEventListener('input', debounce(() => {
-        dataManager.renderLogs(AppState.logs);
-      }, Config.DEBOUNCE_DELAY));
-    }
-    
-    const addTagInput = document.getElementById('newTagInput');
-    if (addTagInput) {
-      addTagInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          parserController.addTag(addTagInput.value);
-          addTagInput.value = '';
-        }
-      });
-    }
-  }
-  
   toggleSidebar() {
     const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+    
     sidebar.classList.toggle('collapsed');
+    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
     
-    localStorage.setItem('sidebarCollapsed', 
-      sidebar.classList.contains('collapsed') ? '1' : '0');
-    
-    const button = document.getElementById('toggleSidebarBtn');
-    if (button) {
-      button.style.transform = 'scale(0.9)';
-      setTimeout(() => {
-        button.style.transform = '';
-      }, 200);
-    }
+    if (DOM.toggleSidebarBtn) animate.scale(DOM.toggleSidebarBtn);
   }
   
   toggleDensity() {
     document.body.classList.toggle('compact');
+    const compact = document.body.classList.contains('compact');
     
-    localStorage.setItem('densityCompact', 
-      document.body.classList.contains('compact') ? '1' : '0');
+    localStorage.setItem('densityCompact', compact ? '1' : '0');
     
-    const button = document.getElementById('toggleDensityBtn');
-    if (button) {
-      button.textContent = document.body.classList.contains('compact') ? 'Normal' : 'Compact';
-      
-      button.style.transform = 'scale(0.9)';
-      setTimeout(() => {
-        button.style.transform = '';
-      }, 200);
+    if (DOM.toggleDensityBtn) {
+      DOM.toggleDensityBtn.textContent = compact ? 'Normal' : 'Compact';
+      animate.scale(DOM.toggleDensityBtn);
     }
   }
   
   async refreshAll() {
-    const button = document.getElementById('refreshBtn');
-    if (button) {
-      button.classList.add('spinning');
-    }
+    if (DOM.refreshBtn) animate.spin(DOM.refreshBtn);
     
     await Promise.all([
       dataManager.updateStats(),
       dataManager.updateEndpoints()
     ]);
     
-    if (button) {
-      setTimeout(() => {
-        button.classList.remove('spinning');
-      }, 500);
-    }
-    
     notifications.show('Data refreshed', 'success');
   }
   
   loadPreferences() {
-    try {
-      if (localStorage.getItem('sidebarCollapsed') === '1') {
-        document.querySelector('.sidebar')?.classList.add('collapsed');
-      }
-      
-      if (localStorage.getItem('densityCompact') === '1') {
-        document.body.classList.add('compact');
-        const button = document.getElementById('toggleDensityBtn');
-        if (button) button.textContent = 'Normal';
-      }
-      
-    } catch (error) {
-      Err.warn('Error loading preferences');
+    if (localStorage.getItem('sidebarCollapsed') === '1') {
+      document.querySelector('.sidebar')?.classList.add('collapsed');
+    }
+    
+    if (localStorage.getItem('densityCompact') === '1') {
+      document.body.classList.add('compact');
+      if (DOM.toggleDensityBtn) DOM.toggleDensityBtn.textContent = 'Normal';
     }
   }
-
-  openRewriteOptions() {
-    const modal = document.getElementById('writeModal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    requestAnimationFrame(() => modal.classList.add('show'));
-  }
-
-  closeRewriteOptions() {
-    const modal = document.getElementById('writeModal');
-    if (!modal) return;
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-  }
-
-  async rewriteLatest() {
-    this.closeRewriteOptions();
-    try {
-      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
-        .find(r => r.checked);
-      const parser_mode = modeRadio ? modeRadio.value : 'default';
-      const res = await fetch('/parser-rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'latest',
-          parser_mode,
-          include_tags: Array.from(AppState.includeSet),
-          exclude_tags: Array.from(AppState.excludeSet)
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        notifications.show(`Wrote ${data.rewritten} file(s)`, 'success');
-        refreshAll();
-      } else {
-        notifications.show('Rewrite failed', 'error');
-      }
-    } catch (e) {
-      notifications.show('Rewrite failed', 'error');
-    }
-  }
-
-  startCustomRewriteSelection() {
-    this.closeRewriteOptions();
-    AppState.selectingLogs = true;
-    AppState.selectedLogs = new Set();
-
-    // Advanced filter: if include mode with exclusive tags picked, narrow list
-    const modeVal = (document.querySelector('input[name="parser_mode"]:checked')?.value || 'default');
-    const modeIsInclude = (modeVal === 'custom') && (AppState.includeSet && AppState.includeSet.size > 0);
-    // Start from the detection scope if present, otherwise all logs
-    let baseList = (AppState.tagDetectScopeOriginal && AppState.tagDetectScopeOriginal.length)
-      ? AppState.tagDetectScopeOriginal.slice()
-      : AppState.logs.slice();
-    let toShow = baseList.slice();
-    if (modeIsInclude && AppState.tagToFilesLower) {
-      // Narrow to files that match at least one included tag AND that tag is exclusive
-      const includeTags = Array.from(AppState.includeSet || []).map(t => String(t).toLowerCase());
-      const totalLogsLower = new Set(baseList.map(n => n.toLowerCase()));
-      const eligibleFilesLower = new Set();
-      includeTags.forEach(tag => {
-        const files = AppState.tagToFilesLower[tag] || [];
-        if (files.length > 0 && files.length < totalLogsLower.size) {
-          files.forEach(f => eligibleFilesLower.add(f));
+  
+  startLogSelection() {
+    State.selectingLogs = true;
+    State.selectedLogs.clear();
+    
+    // Filter logs if in include mode with exclusive tags
+    const mode = document.querySelector('input[name="parser_mode"]:checked')?.value || 'default';
+    if (mode === 'custom' && State.includeSet.size > 0 && State.tagToFilesLower) {
+      const eligible = new Set();
+      const total = new Set(State.logs.map(n => n.toLowerCase()));
+      
+      State.includeSet.forEach(tag => {
+        const files = State.tagToFilesLower[tag] || [];
+        if (files.length > 0 && files.length < total.size) {
+          files.forEach(f => eligible.add(f));
         }
       });
-      if (eligibleFilesLower.size > 0) {
-        toShow = toShow.filter(n => eligibleFilesLower.has(n.toLowerCase()));
+      
+      if (eligible.size > 0) {
+        const filtered = State.logs.filter(n => eligible.has(n.toLowerCase()));
+        dataManager.renderLogsFrom(filtered);
+        dataManager.updateSelectionToolbar();
+        return;
       }
     }
-    dataManager.renderLogs(toShow, false);
+    
+    dataManager.renderLogs();
     dataManager.updateSelectionToolbar();
   }
-
-  toggleSelectAllLogs() {
-    if (!AppState.selectingLogs) return;
-    const total = AppState.logs.length;
-    const allSelected = (AppState.selectedLogs?.size || 0) === total;
-    if (allSelected) {
-      AppState.selectedLogs.clear();
+  
+  toggleSelectAll() {
+    if (!State.selectingLogs) return;
+    
+    if (State.selectedLogs.size === State.logs.length) {
+      State.selectedLogs.clear();
     } else {
-      AppState.selectedLogs = new Set(AppState.logs);
+      State.selectedLogs = new Set(State.logs);
     }
-    dataManager.renderLogs(AppState.logs, false);
+    
+    dataManager.renderLogs();
     dataManager.updateSelectionToolbar();
   }
+}
 
-  async rewriteSelectedLogs() {
-    const files = Array.from(AppState.selectedLogs || []);
+// Navigation controller
+class NavigationController {
+  constructor() {
+    this.sections = [...document.querySelectorAll('section')];
+    this.navItems = [...document.querySelectorAll('.nav-item')];
+    
+    this.navItems.forEach(item => {
+      item.onclick = e => {
+        e.preventDefault();
+        const target = document.getElementById(item.getAttribute('href').slice(1));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          this.setActive(item);
+        }
+      };
+    });
+    
+    window.addEventListener('scroll', debounce(() => this.updateActive(), 50), { passive: true });
+    this.updateActive();
+  }
+  
+  updateActive() {
+    const scrollY = window.scrollY + 120;
+    let current = this.sections[0];
+    
+    for (const section of this.sections) {
+      if (section.offsetTop <= scrollY) current = section;
+    }
+    
+    const active = this.navItems.find(item => 
+      item.getAttribute('href') === `#${current.id}`
+    );
+    
+    if (active) this.setActive(active);
+  }
+  
+  setActive(item) {
+    this.navItems.forEach(navItem => {
+      navItem.classList.remove('active');
+      navItem.removeAttribute('aria-current');
+    });
+    
+    item.classList.add('active');
+    item.setAttribute('aria-current', 'page');
+    animate.scale(item);
+  }
+}
+
+// Initialize everything
+let dataManager, parserController, uiController, navigationController;
+
+async function copyText(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  
+  const value = el.value || el.textContent || '';
+  
+  try {
+    await navigator.clipboard.writeText(value);
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 1000);
+    notifications.show('Copied to clipboard', 'success');
+  } catch {
+    notifications.show('Failed to copy', 'error');
+  }
+}
+
+// Global functions (minimized)
+const globalFunctions = {
+  copyText,
+  closeModal: () => new Modal().hide(),
+  copyModal: async () => {
+    const content = DOM.modalBody?.textContent || '';
+    try {
+      await navigator.clipboard.writeText(content);
+      notifications.show('Copied to clipboard', 'success');
+    } catch {
+      notifications.show('Failed to copy', 'error');
+    }
+  },
+  saveParserSettings: () => parserController.saveSettings(),
+  rewriteParsed: () => parserController.rewrite('all'),
+  openWriteOptions: () => {
+    const modal = document.getElementById('writeModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => modal.classList.add('show'));
+    }
+  },
+  closeWriteOptions: () => {
+    const modal = document.getElementById('writeModal');
+    if (modal) {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+    }
+  },
+  writeLatest: () => {
+    globalFunctions.closeWriteOptions();
+    parserController.rewrite('latest');
+  },
+  startCustomWriteSelection: () => {
+    globalFunctions.closeWriteOptions();
+    uiController.startLogSelection();
+  },
+  toggleSelectAllLogs: () => uiController.toggleSelectAll(),
+  rewriteSelectedLogs: () => {
+    const files = [...State.selectedLogs];
     if (!files.length) {
       notifications.show('No files selected', 'info');
       return;
     }
-    try {
-      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
-        .find(r => r.checked);
-      const parser_mode = modeRadio ? modeRadio.value : 'default';
-      const res = await fetch('/parser-rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'custom',
-          files,
-          parser_mode,
-          include_tags: Array.from(AppState.includeSet),
-          exclude_tags: Array.from(AppState.excludeSet)
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        notifications.show(`Wrote ${data.rewritten} file(s)`, 'success');
-        this.cancelLogSelection();
-        refreshAll();
-      } else {
-        notifications.show('Rewrite failed', 'error');
-      }
-    } catch (e) {
-      notifications.show('Rewrite failed', 'error');
-    }
-  }
-
-  cancelLogSelection() {
-    AppState.selectingLogs = false;
-    AppState.selectedLogs = new Set();
-    dataManager.renderLogs(AppState.logs, false);
+    parserController.rewrite('custom', files);
+  },
+  cancelLogSelection: () => {
+    State.selectingLogs = false;
+    State.selectedLogs.clear();
+    dataManager.renderLogs();
     dataManager.updateSelectionToolbar();
-  }
-}
-
-
-// Encapsulate global bindings to limit pollution
-function attachWindowBindings() {
-  Object.assign(window, {
-    copyText,
-    closeModal: () => new Modal().hide(),
-    copyModal: async () => {
-      const content = document.getElementById('modalBody')?.textContent || '';
-      try {
-        await navigator.clipboard.writeText(content);
-        notifications.show('Copied to clipboard', 'success');
-      } catch (error) {
-        notifications.show('Failed to copy', 'error');
-      }
-    },
-    saveParserSettings: () => parserController.saveSettings(),
-    rewriteParsed: () => parserController.rewriteParsed(),
-    openWriteOptions: () => uiController.openRewriteOptions(),
-    closeWriteOptions: () => uiController.closeRewriteOptions(),
-    writeLatest: () => uiController.rewriteLatest(),
-    startCustomWriteSelection: () => uiController.startCustomRewriteSelection(),
-    toggleSelectAllLogs: () => uiController.toggleSelectAllLogs(),
-    rewriteSelectedLogs: () => uiController.rewriteSelectedLogs(),
-    cancelLogSelection: () => uiController.cancelLogSelection(),
-    toggleAllTags: () => parserController.toggleAllTags(),
-    clearAllTags: () => parserController.clearAllTags(),
-    detectTagsLatest: () => parserController.detectTagsLatest(),
-    detectTagsFromLogs: () => parserController.openTagDetectModal(),
-    closeTagDetect: () => parserController.closeTagDetectModal(),
-    confirmTagDetect: () => parserController.confirmTagDetect(),
-    selectAllTagDetect: () => parserController.selectAllTagDetect(),
-    clearAllTagDetect: () => parserController.clearAllTagDetect(),
-    addTagFromInput: () => {
-      const input = document.getElementById('newTagInput');
-      if (input) {
-        parserController.addTag(input.value);
-        input.value = '';
-      }
-    },
-    refreshAll: () => uiController.refreshAll(),
-    toggleVisibilityById: (id, btn) => {
-      try {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const isHidden = el.style.display === 'none' || getComputedStyle(el).display === 'none';
-        el.style.display = isHidden ? 'block' : 'none';
-        if (btn && btn.setAttribute) btn.setAttribute('aria-expanded', String(isHidden));
-      } catch (_) {}
-    },
-    toggleHelp: (id, btn) => {
-      try {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const hidden = el.getAttribute('aria-hidden') !== 'false';
-        if (!hidden) {
-          el.setAttribute('aria-hidden', 'true');
-          el.classList.remove('show');
-          if (btn) btn.setAttribute('aria-expanded', 'false');
-        } else {
-          el.setAttribute('aria-hidden', 'false');
-          el.classList.add('show');
-          if (btn) btn.setAttribute('aria-expanded', 'true');
-        }
-      } catch (_) {}
+  },
+  toggleAllTags: () => {
+    if (State.includeSet.size === State.allTags.size) {
+      State.excludeSet = new Set(State.allTags);
+      State.includeSet.clear();
+      if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Include All';
+    } else {
+      State.includeSet = new Set(State.allTags);
+      State.excludeSet.clear();
+      if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Exclude All';
     }
-  });
-}
-
-// Lightweight visibility toggle for inline help blocks
-window.toggleVisibilityById = (id, btn) => {
-  try {
+    parserController.renderChips();
+  },
+  clearAllTags: () => {
+    State.includeSet.clear();
+    State.excludeSet = new Set(State.allTags);
+    if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Include All';
+    parserController.renderChips();
+    notifications.show('All tags set to Exclude', 'info');
+  },
+  detectTagsLatest: () => parserController.detectTags('latest'),
+  detectTagsFromLogs: () => {
+    const modal = document.getElementById('tagDetectModal');
+    const container = document.getElementById('tagDetectList');
+    if (!modal || !container) return;
+    
+    if (!State.logs.length) {
+      container.innerHTML = '<div class="empty-state"><p>No logs available.</p></div>';
+    } else {
+      const fragment = document.createDocumentFragment();
+      State.logs.forEach(name => {
+        const label = createElement('label', { class: 'detect-item' }, [
+          createElement('input', { type: 'checkbox', 'data-name': name }),
+          createElement('span', { text: name })
+        ]);
+        fragment.appendChild(label);
+      });
+      container.innerHTML = '';
+      container.appendChild(fragment);
+    }
+    
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => modal.classList.add('show'));
+  },
+  closeTagDetect: () => {
+    const modal = document.getElementById('tagDetectModal');
+    if (modal) {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+    }
+  },
+  confirmTagDetect: () => {
+    const checked = [...document.querySelectorAll('#tagDetectList input:checked')]
+      .map(chk => chk.dataset.name);
+    
+    if (!checked.length) {
+      notifications.show('Select at least one log', 'info');
+      return;
+    }
+    
+    parserController.detectTags('custom', checked);
+    globalFunctions.closeTagDetect();
+  },
+  selectAllTagDetect: () => {
+    document.querySelectorAll('#tagDetectList input[type="checkbox"]')
+      .forEach(chk => chk.checked = true);
+  },
+  clearAllTagDetect: () => {
+    document.querySelectorAll('#tagDetectList input[type="checkbox"]')
+      .forEach(chk => chk.checked = false);
+  },
+  addTagFromInput: () => {
+    if (!DOM.newTagInput) return;
+    const tag = DOM.newTagInput.value.trim().toLowerCase();
+    if (!tag) return;
+    
+    if (!State.allTags.has(tag)) {
+      State.allTags.add(tag);
+      State.excludeSet.add(tag);
+      parserController.renderChips();
+      notifications.show(`Added tag: ${tag}`, 'success');
+    } else {
+      notifications.show('Tag already exists', 'info');
+    }
+    DOM.newTagInput.value = '';
+  },
+  refreshAll: () => uiController.refreshAll(),
+  toggleVisibilityById: (id, btn) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const isHidden = el.style.display === 'none' || getComputedStyle(el).display === 'none';
-    el.style.display = isHidden ? 'block' : 'none';
-    if (btn && btn.setAttribute) btn.setAttribute('aria-expanded', String(isHidden));
-  } catch (_) {}
-};
-
-// Popover-style toggle with aria-hidden control and animation classes
-window.toggleHelp = (id, btn) => {
-  try {
+    const hidden = el.style.display === 'none' || getComputedStyle(el).display === 'none';
+    el.style.display = hidden ? 'block' : 'none';
+    if (btn) btn.setAttribute('aria-expanded', String(hidden));
+  },
+  toggleHelp: (id, btn) => {
     const el = document.getElementById(id);
     if (!el) return;
     const hidden = el.getAttribute('aria-hidden') !== 'false';
-    if (!hidden) {
-      el.setAttribute('aria-hidden', 'true');
-      el.classList.remove('show');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
-    } else {
-      el.setAttribute('aria-hidden', 'false');
-      el.classList.add('show');
-      if (btn) btn.setAttribute('aria-expanded', 'true');
-    }
-  } catch (_) {}
+    el.setAttribute('aria-hidden', String(!hidden));
+    el.classList.toggle('show', hidden);
+    if (btn) btn.setAttribute('aria-expanded', String(hidden));
+  }
 };
 
-
-let navigationController, dataManager, parserController, uiController;
-
+// DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.add('loading');
   
-  navigationController = new NavigationController();
+  initDOMCache();
+  
   dataManager = new DataManager();
   parserController = new ParserController();
   uiController = new UIController();
-  attachWindowBindings();
+  navigationController = new NavigationController();
   
+  Object.assign(window, globalFunctions);
+  
+  // Setup event listeners
+  document.querySelectorAll('input[name="parser_mode"]').forEach(radio => {
+    radio.onchange = e => {
+      const custom = e.target.value === 'custom';
+      if (DOM.tagControls) {
+        DOM.tagControls.style.display = custom ? 'block' : 'none';
+        if (custom) animate.fadeIn(DOM.tagControls);
+      }
+      parserController.updateModeDisplay(e.target.value);
+    };
+  });
+  
+  if (DOM.toggleSidebarBtn) DOM.toggleSidebarBtn.onclick = () => uiController.toggleSidebar();
+  if (DOM.toggleDensityBtn) DOM.toggleDensityBtn.onclick = () => uiController.toggleDensity();
+  if (DOM.refreshBtn) DOM.refreshBtn.onclick = () => uiController.refreshAll();
+  if (DOM.logFilter) DOM.logFilter.oninput = debounce(() => dataManager.renderLogs(), Config.DEBOUNCE_DELAY);
+  if (DOM.newTagInput) DOM.newTagInput.onkeypress = e => {
+    if (e.key === 'Enter') globalFunctions.addTagFromInput();
+  };
+  
+  // Load initial data
   Promise.all([
     dataManager.updateStats(),
-    dataManager.updateEndpoints()
+    dataManager.updateEndpoints(),
+    parserController.loadSettings()
   ]).then(() => {
     document.body.classList.remove('loading');
   });
   
-  AppState.refreshInterval = setInterval(() => {
+  uiController.loadPreferences();
+  
+  // Auto refresh
+  State.refreshTimer = setInterval(() => {
     dataManager.updateStats(true);
     dataManager.updateEndpoints(true);
   }, Config.REFRESH_INTERVAL);
-  
-  const style = document.createElement('style');
-  style.textContent = `
-    .fade-in-up {
-      animation: fadeInUp 0.2s var(--ease-expo) forwards;
-    }
-    
-    .fade-in-scale {
-      animation: fadeInScale 0.16s var(--ease-bounce) forwards;
-    }
-    
-    .fade-in {
-      animation: fadeIn 0.16s var(--ease-smooth) forwards;
-    }
-    
-    .pulse-once {
-      animation: pulseOnce 0.25s var(--ease-bounce);
-    }
-    
-    .spinning {
-      animation: spin 1s linear infinite;
-    }
-    
-    .updating {
-      animation: pulse 0.16s var(--ease-smooth);
-    }
-    
-    .copied {
-      animation: copiedPulse 0.25s var(--ease-bounce);
-    }
-    
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    @keyframes fadeInScale {
-      from {
-        opacity: 0;
-        transform: scale(0.8);
-      }
-      to {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    
-    @keyframes pulseOnce {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-    
-    @keyframes copiedPulse {
-      0% { 
-        background-color: rgba(0, 212, 255, 0.1);
-        border-color: var(--accent-primary);
-      }
-      100% {
-        background-color: rgba(255, 255, 255, 0.02);
-        border-color: var(--border-default);
-      }
-    }
-    
-    /* JSON Syntax Highlighting */
-    .json-key { color: var(--accent-primary); }
-    .json-string { color: var(--accent-success); }
-    .json-number { color: var(--accent-warning); }
-    .json-boolean { color: var(--accent-tertiary); }
-    .json-null { color: var(--text-muted); }
-  `;
-  document.head.appendChild(style);
 });
 
+// Cleanup
 window.addEventListener('beforeunload', () => {
-  if (AppState.refreshInterval) {
-    clearInterval(AppState.refreshInterval);
-  }
+  if (State.refreshTimer) clearInterval(State.refreshTimer);
 });
+
+// CSS animations and utility classes are defined in app/static/css/app.css
