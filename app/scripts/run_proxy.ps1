@@ -173,45 +173,70 @@ function Show-Progress {
     Write-Host "`r$Message [OK]" -ForegroundColor Green
 }
 
-# Verify that the Cloudflare URL resolves and responds before opening it
+# Resolve tunnel hostname without touching the OS resolver, to avoid negative DNS caching.
+function Test-DnsOverHttps {
+    param(
+        [Parameter(Mandatory = $true)][string]$DnsHost,
+        [int]$Retries = 40,
+        [int]$DelayMs = 500
+    )
+
+    $okCloudflare = $false
+    $okGoogle = $false
+
+    for ($i = 0; $i -lt $Retries; $i++) {
+        $okCloudflare = $false
+        $okGoogle = $false
+
+        try {
+            $cfA = Invoke-RestMethod -Headers @{ Accept = 'application/dns-json' } -Uri ("https://cloudflare-dns.com/dns-query?name={0}&type=A" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
+            $cfAAAA = Invoke-RestMethod -Headers @{ Accept = 'application/dns-json' } -Uri ("https://cloudflare-dns.com/dns-query?name={0}&type=AAAA" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
+            if (($cfA.Status -eq 0 -and $cfA.Answer) -or ($cfAAAA.Status -eq 0 -and $cfAAAA.Answer)) { $okCloudflare = $true }
+        } catch { }
+
+        try {
+            $ggA = Invoke-RestMethod -Uri ("https://dns.google/resolve?name={0}&type=A" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
+            $ggAAAA = Invoke-RestMethod -Uri ("https://dns.google/resolve?name={0}&type=AAAA" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
+            if (($ggA.Status -eq 0 -and $ggA.Answer) -or ($ggAAAA.Status -eq 0 -and $ggAAAA.Answer)) { $okGoogle = $true }
+        } catch { }
+
+        if ($okCloudflare -and $okGoogle) { return $true }
+        Start-Sleep -Milliseconds $DelayMs
+    }
+    return $false
+}
+
+# Verify that the Cloudflare URL resolves (via DoH) and responds before publishing it.
 function Test-CloudflaredUrl {
     param (
         [Parameter(Mandatory = $true)] [string] $Url,
-        [int] $Retries = 12,
+        [int] $Retries = 40,
         [int] $DelayMs = 500
     )
 
     try { $uri = [Uri]$Url } catch { return $false }
     $tunnelHost = $uri.Host
 
+    # 1) Wait for public resolvers (Cloudflare + Google) to have the record
+    if (-not (Test-DnsOverHttps -DnsHost $tunnelHost -Retries $Retries -DelayMs $DelayMs)) { return $false }
+
+    # 2) Small grace to let local resolvers catch up
+    Start-Sleep -Milliseconds 500
+
+    # 3) Verify HTTP from here (may use OS resolver, but after DoH is OK it should be published)
     for ($i = 0; $i -lt $Retries; $i++) {
-        $dnsOk = $false
         try {
-            $null = Resolve-DnsName -Name $tunnelHost -ErrorAction Stop
-            $dnsOk = $true
+            $healthUrl = ($Url.TrimEnd('/') + '/health')
+            $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+            if ($resp.StatusCode -eq 200) { return $true }
         } catch {
             try {
-                $ns = nslookup $tunnelHost 2>$null
-                if ($LASTEXITCODE -eq 0 -and $ns) { $dnsOk = $true }
+                $resp2 = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+                if ($resp2.StatusCode -ge 200 -and $resp2.StatusCode -lt 500) { return $true }
             } catch { }
         }
-
-        if ($dnsOk) {
-            try {
-                $healthUrl = ($Url.TrimEnd('/') + '/health')
-                $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-                if ($resp.StatusCode -eq 200) { return $true }
-            } catch {
-                try {
-                    $resp2 = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-                    if ($resp2.StatusCode -ge 200 -and $resp2.StatusCode -lt 500) { return $true }
-                } catch { }
-            }
-        }
-
         Start-Sleep -Milliseconds $DelayMs
     }
-
     return $false
 }
 
@@ -455,16 +480,23 @@ $tunnelLogErr = [System.IO.Path]::GetTempFileName()
 $cfExe = (Get-Command (Join-Path $PSScriptRoot "cloudflared.exe") -ErrorAction SilentlyContinue)
 if (-not $cfExe) { $cfExe = (Get-Command cloudflared -ErrorAction SilentlyContinue) }
 
+# Build robust cloudflared flags (IPv4 + QUIC + HA). Allow override via env CLOUDFLARED_FLAGS.
+$cfFlags = $env:CLOUDFLARED_FLAGS
+if (-not $cfFlags -or [string]::IsNullOrWhiteSpace($cfFlags)) {
+    $cfFlags = "--edge-ip-version 4 --protocol quic --ha-connections 2 --loglevel info"
+}
+$cfArgList = @('tunnel','--no-autoupdate') + ($cfFlags -split '\s+') + @('--url', "http://127.0.0.1:$Port")
+
 if ($AttachChildrenToConsole) {
     $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-        -ArgumentList "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port" `
+        -ArgumentList $cfArgList `
         -RedirectStandardOutput $tunnelLogOut `
         -RedirectStandardError $tunnelLogErr `
         -PassThru `
         -NoNewWindow
 } else {
     $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-        -ArgumentList "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port" `
+        -ArgumentList $cfArgList `
         -RedirectStandardOutput $tunnelLogOut `
         -RedirectStandardError $tunnelLogErr `
         -PassThru `
@@ -537,14 +569,14 @@ if ($url -and $url.Trim()) {
         # Start cloudflared again
         if ($AttachChildrenToConsole) {
             $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-                -ArgumentList "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port" `
+                -ArgumentList $cfArgList `
                 -RedirectStandardOutput $tunnelLogOut `
                 -RedirectStandardError $tunnelLogErr `
                 -PassThru `
                 -NoNewWindow
         } else {
             $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-                -ArgumentList "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:$Port" `
+                -ArgumentList $cfArgList `
                 -RedirectStandardOutput $tunnelLogOut `
                 -RedirectStandardError $tunnelLogErr `
                 -PassThru `

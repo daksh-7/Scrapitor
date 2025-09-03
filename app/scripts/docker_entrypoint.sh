@@ -56,7 +56,7 @@ done
 CF_LOG="/tmp/cloudflared.log"
 # Truncate the log file but keep the same path for tail -F stability
 : > "$CF_LOG"
-# Force IPv4 + HTTP/2 which is often more reliable behind NAT/WSL and corporate networks
+# Force IPv4 + QUIC which is often more reliable behind NAT/WSL and corporate networks
 CLOUDFLARED_FLAGS=${CLOUDFLARED_FLAGS:-"--edge-ip-version 4 --protocol quic --ha-connections 2 --loglevel info"}
 cloudflared tunnel --no-autoupdate $CLOUDFLARED_FLAGS --url "http://127.0.0.1:$PORT" >"$CF_LOG" 2>&1 &
 CF_PID=$!
@@ -90,38 +90,51 @@ while :; do
     URL=$(grep -a -oE 'https://[A-Za-z0-9-]+\.trycloudflare\.com' "$CF_LOG" 2>/dev/null | head -n1 || true)
   fi
   if [ -n "$URL" ]; then
-    # Publish ASAP so UI and users can copy while verification continues
-    printf "%s" "$URL" > "$STATE_DIR/tunnel_url.txt"
-    # Print URLs immediately before verification
-    log ""
-    log "Cloudflare URL: $URL"
-    log "JanitorAI API URL: $URL/openrouter-cc"
-    log "(Verification in background; URL may take a few seconds to become reachable)"
-    # Verify DNS/HTTP by hitting /health or root
-    ok=0
-    i=0
-    while [ $i -lt 40 ]; do
-      if curl -fsS "$URL/health" >/dev/null 2>&1 || curl -fsS "$URL" >/dev/null 2>&1; then
-        ok=1; break
-      fi
-      i=$(( i + 1 ))
-      sleep 0.5
-    done
-    if [ "$ok" -eq 1 ]; then
-      break
-    else
-      if [ "$RESTARTED" -eq 0 ]; then
-        # Restart cloudflared once if initial URL fails verification
-        kill "$CF_PID" 2>/dev/null || true
-        sleep 0.2
-        : > "$CF_LOG"
-        cloudflared tunnel --no-autoupdate $CLOUDFLARED_FLAGS --url "http://127.0.0.1:$PORT" >"$CF_LOG" 2>&1 &
-        CF_PID=$!
-        RESTARTED=1
+    # Extract host for DoH checks (avoid poisoning local DNS cache)
+    host=$(printf "%s" "$URL" | sed -E 's#https?://([^/]+)/?.*#\1#')
+    # Verify DNS via DoH (Cloudflare and Google) before publishing
+    doh_ok_cf=0
+    doh_ok_gg=0
+    j_cf_a=$(curl -fsS -H 'accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=${host}&type=A" || true)
+    j_cf_aaaa=$(curl -fsS -H 'accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=${host}&type=AAAA" || true)
+    printf "%s%s" "$j_cf_a" "$j_cf_aaaa" | grep -q '"Status"[[:space:]]*:[[:space:]]*0' && echo "$j_cf_a$j_cf_aaaa" | grep -q '"Answer"' && doh_ok_cf=1 || doh_ok_cf=0
+    j_gg_a=$(curl -fsS "https://dns.google/resolve?name=${host}&type=A" || true)
+    j_gg_aaaa=$(curl -fsS "https://dns.google/resolve?name=${host}&type=AAAA" || true)
+    printf "%s%s" "$j_gg_a" "$j_gg_aaaa" | grep -q '"Status"[[:space:]]*:[[:space:]]*0' && echo "$j_gg_a$j_gg_aaaa" | grep -q '"Answer"' && doh_ok_gg=1 || doh_ok_gg=0
+
+    if [ "$doh_ok_cf" -eq 1 ] && [ "$doh_ok_gg" -eq 1 ]; then
+      # Publish now so UI can read it; HTTP verification follows
+      printf "%s" "$URL" > "$STATE_DIR/tunnel_url.txt"
+      log ""
+      log "Cloudflare URL: $URL"
+      log "JanitorAI API URL: $URL/openrouter-cc"
+      log "(Verified via DoH; confirming HTTP readiness)"
+      ok=0
+      i=0
+      while [ $i -lt 40 ]; do
+        if curl -fsS "$URL/health" >/dev/null 2>&1 || curl -fsS "$URL" >/dev/null 2>&1; then
+          ok=1; break
+        fi
+        i=$(( i + 1 ))
+        sleep 0.5
+      done
+      if [ "$ok" -eq 1 ]; then
+        break
+      else
+        if [ "$RESTARTED" -eq 0 ]; then
+          kill "$CF_PID" 2>/dev/null || true
+          sleep 0.2
+          : > "$CF_LOG"
+          cloudflared tunnel --no-autoupdate $CLOUDFLARED_FLAGS --url "http://127.0.0.1:$PORT" >"$CF_LOG" 2>&1 &
+          CF_PID=$!
+          RESTARTED=1
+          URL=""
+          start_ts=$(date +%s)
+          continue
+        fi
         URL=""
-        start_ts=$(date +%s)
-        continue
       fi
+    else
       URL=""
     fi
   fi
@@ -166,5 +179,4 @@ while :; do
   fi
   sleep 1
 done
-
 
