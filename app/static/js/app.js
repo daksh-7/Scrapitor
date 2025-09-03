@@ -7,7 +7,7 @@ const initDOMCache = () => {
     'notification', 'parser_mode_val', 'tagControls', 'tagChips', 'newTagInput',
     'toggleAllBtn', 'selectionToolbar', 'toggleSelectAllBtn', 'modalBackBtn',
     'tagDetectModal', 'tagDetectList', 'writeModal', 'refreshBtn', 'toggleSidebarBtn',
-    'toggleDensityBtn'
+    'toggleDensityBtn', 'totalLogs', 'parsedTotal'
   ];
   ids.forEach(id => { DOM[id] = document.getElementById(id); });
 };
@@ -18,6 +18,7 @@ const State = {
   excludeSet: new Set(),
   allTags: new Set(),
   logs: [],
+  logMeta: new Map(), // name -> {mtime, size}
   selectedLogs: new Set(),
   selectingLogs: false,
   tagToFilesLower: {},
@@ -250,7 +251,7 @@ class DataManager {
   async updateStats(silent = false) {
     try {
       const data = await api.getJson('/logs');
-      const total = data.total || 0;
+      const total = data.total || 0; // since startup
       
       if (DOM.requestCount) {
         const current = parseInt(DOM.requestCount.textContent.replace(/,/g, '') || '0');
@@ -260,6 +261,25 @@ class DataManager {
       }
       
       State.logs = data.logs || [];
+      // Build metadata map for timestamps and sizes
+      State.logMeta = new Map();
+      if (Array.isArray(data.items)) {
+        data.items.forEach(it => {
+          if (it && it.name) {
+            State.logMeta.set(it.name, { mtime: Number(it.mtime) || 0, size: Number(it.size) || 0 });
+          }
+        });
+      }
+
+      // Update additional metrics if present
+      if (DOM.totalLogs && typeof data.total_all === 'number') {
+        const cur = parseInt(DOM.totalLogs.textContent.replace(/,/g, '') || '0');
+        if (cur !== data.total_all) this.animateCounter(DOM.totalLogs, cur, data.total_all);
+      }
+      if (DOM.parsedTotal && typeof data.parsed_total === 'number') {
+        const cur = parseInt(DOM.parsedTotal.textContent.replace(/,/g, '') || '0');
+        if (cur !== data.parsed_total) this.animateCounter(DOM.parsedTotal, cur, data.parsed_total);
+      }
       this.renderLogs(!silent);
       // Opportunistic prefetch to make first opens instant
       this.schedulePrefetch(State.logs);
@@ -341,7 +361,8 @@ class DataManager {
     
     if (State.selectingLogs) {
       const span = createElement('span', { class: 'log-filename', text: name });
-      const time = createElement('span', { class: 'log-time', text: getRelativeTime() });
+      const meta = State.logMeta.get(name);
+      const time = createElement('span', { class: 'log-time', text: this.formatMTime(meta?.mtime) });
       item.appendChild(span);
       item.appendChild(time);
       item.classList.add('selectable');
@@ -371,12 +392,26 @@ class DataManager {
     left.appendChild(txtBtn);
     left.appendChild(renameBtn);
     
-    const time = createElement('span', { class: 'log-time', text: getRelativeTime() });
+    const meta = State.logMeta.get(name);
+    const time = createElement('span', { class: 'log-time', text: this.formatMTime(meta?.mtime) });
     item.appendChild(left);
     item.appendChild(time);
     
     item.onclick = () => this.openLog(name);
     return item;
+  }
+
+  formatMTime(mtime) {
+    if (!mtime || Number.isNaN(mtime)) return '';
+    try {
+      const d = new Date(mtime * 1000);
+      // HH:MM if today, otherwise YYYY-MM-DD HH:MM
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const hhmm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if (d.toDateString() === now.toDateString()) return hhmm;
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${hhmm}`;
+    } catch { return ''; }
   }
   
   toggleLogSelection(e, name, el) {

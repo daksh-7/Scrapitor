@@ -18,6 +18,38 @@
           </div>
         </div>
       </div>
+      <div class="metric-card" aria-live="polite">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">All Log Files</div>
+            <div class="metric-value" id="totalLogs">0</div>
+            <div class="metric-label">In logs folder</div>
+          </div>
+          <div class="metric-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="metric-card" aria-live="polite">
+        <div class="metric-header">
+          <div>
+            <div class="metric-title">Parsed Texts</div>
+            <div class="metric-value" id="parsedTotal">0</div>
+            <div class="metric-label">All versions</div>
+          </div>
+          <div class="metric-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20l9-5-9-5-9 5 9 5z"/>
+              <path d="M3 10l9-5 9 5"/>
+            </svg>
+          </div>
+        </div>
+      </div>
       <div class="metric-card">
         <div class="metric-header">
           <div>
@@ -71,25 +103,23 @@
       </div>
     </div>
     <ol class="setup-steps">
-      <li>Initiate a chat with the desired character on JanitorAI.</li>
-      <li>Click "using proxy"; under "proxy", add a configuration and name it anything.</li>
-      <li>For model name, paste: <code>mistralai/mistral-small-3.2-24b-instruct:free</code></li>
-      <li>Paste the Cloudflare URL (copied above) under "Proxy URL."</li>
+      <li>Open your character chat in JanitorAI.</li>
+      <li>Turn on Using proxy and create a new proxy profile.</li>
+      <li>Model name: <code>mistralai/mistral-small-3.2-24b-instruct:free</code>.</li>
+      <li>Proxy URL: paste the Cloudflare endpoint shown above.</li>
       <li>
-        Enter your OpenRouter API
+        API Key: paste your OpenRouter
         <span class="inline-help-anchor">key
           <button type="button" class="help-badge" onclick="toggleHelp('openrouterApiHelp', this)" aria-expanded="false" aria-controls="openrouterApiHelp" title="How to get API key">?</button>
-        </span>&nbsp;&nbsp;
-        in the "API Key" section.
+        </span>.
         <div id="openrouterApiHelp" class="help-pop" aria-hidden="true">
-          To get an API key: log in to
+          Log in at
           <a href="https://openrouter.ai" target="_blank" rel="noreferrer noopener">openrouter.ai</a>,
-          navigate to <strong>Keys</strong> under the profile picture circle at the top right corner,
-          click <strong>Create API Key</strong>, and copy it.
+          open <strong>Keys</strong> from your profile menu, click <strong>Create API Key</strong>, then copy it.
         </div>
       </li>
-      <li>Click "Save changes" then "Save Settings" and refresh the page.</li>
-      <li>Enter any sample message (e.g., "hi"); the app will then receive the model data.</li>
+      <li>Save changes and Save Settings in JanitorAI, then refresh this page.</li>
+      <li>Send a quick test message (e.g., Hi) to verify the connection.</li>
     </ol>
   </section>
 

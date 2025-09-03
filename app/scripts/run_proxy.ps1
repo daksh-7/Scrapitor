@@ -328,6 +328,9 @@ try {
 } catch {
     Write-ColorOutput "ERROR: Failed to install dependencies" -Color Red
     if ($pipOutput) { $pipOutput | ForEach-Object { Write-Host "  $_" } } else { Write-Host $_ }
+    Write-Host ""
+    Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+    Confirm-ExitPrompt
     exit 1
 }
 
@@ -467,6 +470,9 @@ if (-not $healthOk) {
         Get-Content $flaskErr -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
     }
     try { if ($flaskProcess -and !$flaskProcess.HasExited) { Stop-Process -Id $flaskProcess.Id -Force } } catch {}
+    Write-Host ""
+    Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+    Confirm-ExitPrompt
     exit 1
 }
 
@@ -637,6 +643,11 @@ if ($url -and $url.Trim()) {
 
         if ($flaskProcess -and !$flaskProcess.HasExited) { Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue }
         if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) { Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue }
+        # Keep temp logs so the user can scroll and inspect; cleanup will happen on exit confirmation
+        Write-Host ""
+        Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+        Confirm-ExitPrompt
+        # Cleanup after confirmation
         if (Test-Path $tunnelLogOut) { Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue }
         if (Test-Path $tunnelLogErr) { Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue }
         if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
@@ -725,6 +736,8 @@ if ($url -and $url.Trim()) {
             if ($flaskProcess.HasExited -or $cloudflaredProcess.HasExited) {
                 Write-ColorOutput "ERROR: One of the processes has stopped unexpectedly" -Color Red
                 & $cleanupBlock
+                Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+                Confirm-ExitPrompt
                 exit 1
             }
 
@@ -784,7 +797,11 @@ if ($url -and $url.Trim()) {
         Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
     }
     
-    # Remove temp log files
+    Write-Host ""
+    Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+    Confirm-ExitPrompt
+    
+    # Remove temp log files after confirmation
     if (Test-Path $tunnelLogOut) {
         Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue
     }
@@ -793,5 +810,5 @@ if ($url -and $url.Trim()) {
     }
     if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
     if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
 }

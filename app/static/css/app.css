@@ -376,6 +376,10 @@ body::before {
   box-shadow: 0 0 20px rgba(0, 255, 136, 0.15);
 }
 
+/* Centered variant with mirrored pulse dots */
+.status-centered { justify-content: center; gap: clamp(1rem, 8vw, 2.25rem); }
+.sidebar-footer .status-centered { margin-left: auto; margin-right: auto; }
+
 .pulse-dot {
   width: 8px;
   height: 8px;
@@ -1087,9 +1091,11 @@ textarea:focus {
   font-weight: 500;
 }
 
+
+/* Setup steps — professional, subtle, tidy */
 .setup-steps {
   margin: var(--space-lg) 0;
-  padding-left: var(--space-lg);
+  padding-left: var(--space-md);
   color: var(--text-secondary);
   list-style: none;
   counter-reset: step-counter;
@@ -1098,26 +1104,28 @@ textarea:focus {
 .setup-steps li {
   margin: var(--space-md) 0;
   position: relative;
-  padding-left: var(--space-xl);
+  padding-left: calc(var(--space-lg) + 12px);
   counter-increment: step-counter;
+  line-height: 1.55;
 }
 
 .setup-steps li::before {
   content: counter(step-counter);
   position: absolute;
   left: 0;
-  top: 0;
-  width: 24px;
-  height: 24px;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  top: 0.05rem;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 600;
   font-size: 0.75rem;
-  color: var(--bg-primary);
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  box-shadow: none;
 }
 
 .setup-steps a {
@@ -1506,6 +1514,13 @@ body.compact .setup-steps li::before {
   stroke: currentColor;
   fill: none;
 }
+
+/* JSON syntax highlight colors */
+.json-key { color: var(--accent-primary); }
+.json-string { color: var(--accent-success); }
+.json-number { color: var(--accent-warning); }
+.json-boolean { color: var(--accent-tertiary); }
+.json-null { color: var(--text-muted); }
 
 /* Utility animation classes used by JS */
 .fade-in-up { animation: fadeInUp 0.2s var(--ease-expo) forwards; }

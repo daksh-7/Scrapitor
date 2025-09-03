@@ -100,6 +100,7 @@ PARSED_ROOT = (LOG_DIR / "parsed").resolve(); PARSED_ROOT.mkdir(parents=True, ex
 MAX_LOG_FILES = CONFIG["logging"]["max_files"]
 GEN_CFG = CONFIG["openrouter"]["defaults"].copy()
 STARTED_MONO = time.monotonic()
+STARTED_EPOCH = time.time()
 
 # Parser settings (mutable at runtime, persisted under var/state)
 _PARSER_SETTINGS_PATH = (BASE_DIR / "var/state/parser_settings.json").resolve()
@@ -415,8 +416,33 @@ def create_app() -> Flask:
     @app.route("/logs")
     def list_logs():
         files = sorted(LOG_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-        names = [p.name for p in files[:50]]
-        return jsonify({"logs": names, "total": len(files), "recent": names})
+        items = []
+        since_start = 0
+        for p in files:
+            try:
+                st = p.stat()
+                mtime = st.st_mtime
+                if mtime >= STARTED_EPOCH:
+                    since_start += 1
+                items.append({"name": p.name, "mtime": mtime, "size": st.st_size})
+            except Exception:
+                continue
+        # Total parsed txts (all-time)
+        parsed_total = 0
+        try:
+            for _ in PARSED_ROOT.rglob("*.txt"):
+                parsed_total += 1
+        except Exception:
+            parsed_total = 0
+        names = [it["name"] for it in items[:50]]
+        return jsonify({
+            "logs": names,
+            "items": items[:200],
+            "total": since_start,
+            "total_all": len(files),
+            "parsed_total": parsed_total,
+            "recent": names
+        })
 
     @app.route("/logs/<name>")
     def get_log(name: str):
