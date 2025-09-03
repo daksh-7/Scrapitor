@@ -732,6 +732,82 @@ body::before {
     0 0 20px rgba(0, 212, 255, 0.1);
 }
 
+/* Toolbar: compact, professional, low-contrast buttons */
+.action-bar {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease-smooth), background-color 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth);
+}
+
+.toolbar-btn:hover {
+  border-color: var(--border-interactive);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-btn:active { transform: translateY(0.5px); }
+
+.toolbar-btn--accent {
+  border-color: var(--border-interactive);
+  color: var(--accent-primary);
+}
+.toolbar-btn--accent:hover {
+  background: rgba(0, 212, 255, 0.06);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.08);
+}
+
+.toolbar-btn--danger { color: var(--accent-danger); border-color: rgba(255, 51, 102, 0.35); }
+.toolbar-btn--danger:hover { background: rgba(255, 51, 102, 0.08); box-shadow: 0 0 0 2px rgba(255, 51, 102, 0.1); }
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+/* Compact, professional toolbar buttons */
+.action-bar {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.action-bar .button,
+.action-bar .button-secondary {
+  border-radius: var(--radius-full);
+}
+.button-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.1;
+}
+.button .btn-icon,
+.button-secondary .btn-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  margin-right: 0.45rem;
+}
+
 .input-group {
   display: flex;
   gap: var(--space-sm);

@@ -1106,18 +1106,27 @@ const globalFunctions = {
     if (State.includeSet.size === State.allTags.size) {
       State.excludeSet = new Set(State.allTags);
       State.includeSet.clear();
-      if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Include All';
+      if (DOM.toggleAllBtn) {
+        const lbl = DOM.toggleAllBtn.querySelector('.btn-label');
+        if (lbl) lbl.textContent = 'Include All'; else DOM.toggleAllBtn.textContent = 'Include All';
+      }
     } else {
       State.includeSet = new Set(State.allTags);
       State.excludeSet.clear();
-      if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Exclude All';
+      if (DOM.toggleAllBtn) {
+        const lbl = DOM.toggleAllBtn.querySelector('.btn-label');
+        if (lbl) lbl.textContent = 'Exclude All'; else DOM.toggleAllBtn.textContent = 'Exclude All';
+      }
     }
     parserController.renderChips();
   },
   clearAllTags: () => {
     State.includeSet.clear();
     State.excludeSet = new Set(State.allTags);
-    if (DOM.toggleAllBtn) DOM.toggleAllBtn.textContent = 'Include All';
+    if (DOM.toggleAllBtn) {
+      const lbl = DOM.toggleAllBtn.querySelector('.btn-label');
+      if (lbl) lbl.textContent = 'Include All'; else DOM.toggleAllBtn.textContent = 'Include All';
+    }
     parserController.renderChips();
     notifications.show('All tags set to Exclude', 'info');
   },
