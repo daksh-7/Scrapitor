@@ -20,6 +20,36 @@ const Config = {
 };
 
 
+// Lightweight, consistent error + fetch helpers
+const Err = {
+  info(message) {
+    try { console.info(message); } catch (_) {}
+    try { notifications.show(String(message), 'info'); } catch (_) {}
+  },
+  warn(message) {
+    try { console.warn(message); } catch (_) {}
+    try { notifications.show(String(message), 'warning'); } catch (_) {}
+  },
+  error(message, err) {
+    try { console.error(message, err || ''); } catch (_) {}
+    try { notifications.show(String(message), 'error'); } catch (_) {}
+  }
+};
+
+const Http = {
+  async getJson(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  },
+  async getText(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  }
+};
+
+
 /**
  * Debounce function for performance
  */
@@ -243,8 +273,7 @@ class DataManager {
       AppState.isLoading = true;
       if (!silent) this.showLoadingState();
       
-      const response = await fetch('/logs');
-      const data = await response.json();
+      const data = await Http.getJson('/logs');
       
       const total = data.total || 0;
       const requestCountEl = document.getElementById('requestCount');
@@ -262,8 +291,7 @@ class DataManager {
       this.schedulePrefetch(logs);
       
     } catch (error) {
-      console.error('Failed to update stats:', error);
-      notifications.show('Failed to load data', 'error');
+      Err.error('Failed to load data', error);
     } finally {
       AppState.isLoading = false;
       if (!silent) this.hideLoadingState();
@@ -272,158 +300,118 @@ class DataManager {
   
   renderLogs(logs, animate = false) {
     AppState.logs = logs;
-    const filter = (document.getElementById('logFilter')?.value || '').toLowerCase().trim();
+    const filterVal = (document.getElementById('logFilter')?.value || '').toLowerCase().trim();
     const logsContainer = document.getElementById('logs');
-    
     if (!logsContainer) return;
-    
-    const filteredLogs = logs.filter(log => 
-      !filter || log.toLowerCase().includes(filter)
-    ).slice(0, Config.MAX_LOGS_DISPLAY);
-    
-    if (filteredLogs.length === 0) {
+
+    const filtered = logs.filter(name => !filterVal || name.toLowerCase().includes(filterVal))
+      .slice(0, Config.MAX_LOGS_DISPLAY);
+    if (filtered.length === 0) {
       this.renderEmptyState(logsContainer);
       return;
     }
-    
-    const logElements = filteredLogs.map((name, index) => {
-      const logItem = document.createElement('div');
-      logItem.className = 'log-item';
-      logItem.dataset.name = name;
-      if (animate) {
-        logItem.style.animationDelay = `${index * 20}ms`;
-      }
-      const left = AppState.selectingLogs ? `
-        <span class="log-filename">${this.escapeHtml(name)}</span>
-      ` : `
-        <div class="log-left">
-          <span class="log-filename">${this.escapeHtml(name)}</span>
-          <button class="mini-btn mini-txt-btn loud" title="View parsed TXT" aria-label="View parsed TXT for ${this.escapeHtml(name)}">TXT</button>
-          <button class="icon-btn mini-rename-btn" title="Rename log" aria-label="Rename ${this.escapeHtml(name)}">✎</button>
-        </div>
-      `;
-      const right = `<span class="log-time">${this.getRelativeTime()}</span>`;
-      logItem.innerHTML = `${left}${right}`;
-      // Selection support
-      if (AppState.selectingLogs) {
-        logItem.classList.add('selectable');
-        if (AppState.selectedLogs && AppState.selectedLogs.has(name)) {
-          logItem.classList.add('active');
-          logItem.setAttribute('aria-selected', 'true');
-        } else {
-          logItem.removeAttribute('aria-selected');
-        }
-        logItem.addEventListener('click', (e) => this.toggleLogSelection(e, name, logItem));
-      } else {
-        logItem.addEventListener('click', (ev) => {
-          // If inline rename is active on this row, do not open
-          if (logItem.querySelector('.inline-rename')) {
-            try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
-            return;
-          }
-          this.openLog(name);
-        });
-        const txtBtn = logItem.querySelector('.mini-txt-btn');
-        if (txtBtn) {
-          const stopAll = (e) => { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} };
-          txtBtn.addEventListener('pointerdown', stopAll, { passive: false });
-          txtBtn.addEventListener('mousedown', stopAll, { passive: false });
-          txtBtn.addEventListener('click', (e) => {
-            stopAll(e);
-            this.openParsedList(name);
-          }, { passive: false });
-        }
-        const rnBtn = logItem.querySelector('.mini-rename-btn');
-        if (rnBtn) {
-          const stopAll = (e) => { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} };
-          rnBtn.addEventListener('pointerdown', stopAll, { passive: false });
-          rnBtn.addEventListener('mousedown', stopAll, { passive: false });
-          rnBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const left = logItem.querySelector('.log-left');
-            if (!left) return;
-            const nameSpan = left.querySelector('.log-filename');
-            const txtButton = left.querySelector('.mini-txt-btn');
-            const pencil = rnBtn;
 
-            // Prevent double init
-            if (left.querySelector('.inline-rename')) return;
-
-            // Hide existing elements
-            if (nameSpan) nameSpan.style.display = 'none';
-            if (txtButton) txtButton.style.display = 'none';
-            if (pencil) pencil.style.display = 'none';
-
-            // Inline editor
-            const wrap = document.createElement('div');
-            wrap.className = 'inline-rename';
-            wrap.addEventListener('click', stopAll, { passive: false });
-            const input = document.createElement('input');
-            input.className = 'copy-input rename-input';
-            input.value = name;
-            input.style.flex = '1';
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'button button-secondary';
-            cancelBtn.textContent = 'Cancel';
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'button';
-            saveBtn.textContent = 'Save';
-            wrap.appendChild(input);
-            wrap.appendChild(cancelBtn);
-            wrap.appendChild(saveBtn);
-            left.appendChild(wrap);
-
-            setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 0);
-
-            const cleanup = () => {
-              try { left.removeChild(wrap); } catch (_) {}
-              if (nameSpan) nameSpan.style.display = '';
-              if (txtButton) txtButton.style.display = '';
-              if (pencil) pencil.style.display = '';
-            };
-
-            cancelBtn.addEventListener('click', (ev) => { stopAll(ev); cleanup(); });
-            input.addEventListener('keydown', (ev) => {
-              if (ev.key === 'Enter') { ev.preventDefault(); saveBtn.click(); }
-              if (ev.key === 'Escape') { ev.preventDefault(); cancelBtn.click(); }
-            }, { passive: false });
-            saveBtn.addEventListener('click', async (ev) => {
-              stopAll(ev);
-              const newName = (input.value || '').trim();
-              if (!newName || newName === name) { cleanup(); return; }
-            try {
-                const res = await fetch(`/logs/${encodeURIComponent(name)}/rename`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ new_name: newName })
-                });
-                if (res.ok) {
-                  notifications.show('Log renamed', 'success');
-                  dataManager.clearParsedCachesFor(name);
-                  await dataManager.updateStats();
-                } else {
-                  const err = await res.json().catch(() => ({}));
-                  notifications.show(err.error || 'Rename failed', 'error');
-                }
-              } catch (_) {
-                notifications.show('Rename failed', 'error');
-              } finally {
-                cleanup();
-              }
-            });
-          });
-        }
-      }
-      
-      return logItem;
-    });
-    
     logsContainer.innerHTML = '';
-    logElements.forEach(el => {
-      if (animate) {
-        el.classList.add('fade-in-up');
-      }
+    filtered.forEach((name, idx) => {
+      const el = this._createLogItem(name, animate ? idx : null);
       logsContainer.appendChild(el);
+    });
+  }
+
+  _createEl(tag, attrs = {}, children = []) {
+    const el = document.createElement(tag);
+    Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k === 'html') el.innerHTML = v;
+      else el.setAttribute(k, v);
+    });
+    children.forEach(c => { if (c) el.appendChild(c); });
+    return el;
+  }
+
+  _createLogItem(name, animIndex) {
+    const item = this._createEl('div', { class: 'log-item' });
+    item.dataset.name = name;
+    if (animIndex !== null) item.style.animationDelay = `${animIndex * 20}ms`;
+
+    if (AppState.selectingLogs) {
+      const leftSpan = this._createEl('span', { class: 'log-filename', text: name });
+      const time = this._createEl('span', { class: 'log-time', text: this.getRelativeTime() });
+      item.appendChild(leftSpan); item.appendChild(time);
+      item.classList.add('selectable');
+      if (AppState.selectedLogs && AppState.selectedLogs.has(name)) {
+        item.classList.add('active'); item.setAttribute('aria-selected', 'true');
+      }
+      item.addEventListener('click', (e) => this.toggleLogSelection(e, name, item));
+      return item;
+    }
+
+    const left = this._createEl('div', { class: 'log-left' });
+    const nameSpan = this._createEl('span', { class: 'log-filename', text: name });
+    const txtBtn = this._createEl('button', { class: 'mini-btn mini-txt-btn loud', title: 'View parsed TXT', 'aria-label': `View parsed TXT for ${name}` });
+    txtBtn.textContent = 'TXT';
+    const rnBtn = this._createEl('button', { class: 'icon-btn mini-rename-btn', title: 'Rename log', 'aria-label': `Rename ${name}` });
+    rnBtn.textContent = '✎';
+    left.appendChild(nameSpan); left.appendChild(txtBtn); left.appendChild(rnBtn);
+    const time = this._createEl('span', { class: 'log-time', text: this.getRelativeTime() });
+    item.appendChild(left); item.appendChild(time);
+
+    item.addEventListener('click', (ev) => {
+      if (item.querySelector('.inline-rename')) { try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {} return; }
+      this.openLog(name);
+    });
+    const stopAll = (e) => { try { e.preventDefault(); e.stopPropagation(); } catch (_) {} };
+    txtBtn.addEventListener('pointerdown', stopAll, { passive: false });
+    txtBtn.addEventListener('mousedown', stopAll, { passive: false });
+    txtBtn.addEventListener('click', (e) => { stopAll(e); this.openParsedList(name); }, { passive: false });
+
+    rnBtn.addEventListener('pointerdown', stopAll, { passive: false });
+    rnBtn.addEventListener('mousedown', stopAll, { passive: false });
+    rnBtn.addEventListener('click', (e) => this._startInlineRename(e, item, name));
+    if (animIndex !== null) item.classList.add('fade-in-up');
+    return item;
+  }
+
+  async _startInlineRename(e, item, name) {
+    e.stopPropagation();
+    const left = item.querySelector('.log-left');
+    if (!left || left.querySelector('.inline-rename')) return;
+    const nameSpan = left.querySelector('.log-filename');
+    const txtButton = left.querySelector('.mini-txt-btn');
+    const pencil = left.querySelector('.mini-rename-btn');
+    if (nameSpan) nameSpan.style.display = 'none';
+    if (txtButton) txtButton.style.display = 'none';
+    if (pencil) pencil.style.display = 'none';
+    const wrap = this._createEl('div', { class: 'inline-rename' });
+    const input = this._createEl('input', { class: 'copy-input rename-input' }); input.value = name; input.style.flex = '1';
+    const cancelBtn = this._createEl('button', { class: 'button button-secondary', text: 'Cancel' });
+    const saveBtn = this._createEl('button', { class: 'button', text: 'Save' });
+    wrap.appendChild(input); wrap.appendChild(cancelBtn); wrap.appendChild(saveBtn); left.appendChild(wrap);
+    setTimeout(() => { try { input.focus(); input.select(); } catch (_) {} }, 0);
+    const cleanup = () => { try { left.removeChild(wrap); } catch (_) {}; if (nameSpan) nameSpan.style.display = ''; if (txtButton) txtButton.style.display = ''; if (pencil) pencil.style.display = ''; };
+    const stopAll = (ev) => { try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {} };
+    cancelBtn.addEventListener('click', (ev) => { stopAll(ev); cleanup(); });
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); saveBtn.click(); } if (ev.key === 'Escape') { ev.preventDefault(); cancelBtn.click(); } }, { passive: false });
+    saveBtn.addEventListener('click', async (ev) => {
+      stopAll(ev);
+      const newName = (input.value || '').trim();
+      if (!newName || newName === name) { cleanup(); return; }
+      try {
+        const res = await fetch(`/logs/${encodeURIComponent(name)}/rename`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ new_name: newName }) });
+        if (res.ok) {
+          notifications.show('Log renamed', 'success');
+          dataManager.clearParsedCachesFor(name);
+          await dataManager.updateStats();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          Err.error(err.error || 'Rename failed');
+        }
+      } catch (err) {
+        Err.error('Rename failed', err);
+      } finally {
+        cleanup();
+      }
     });
   }
 
@@ -444,38 +432,39 @@ class DataManager {
         return;
       }
 
-      const listItems = versions.map(v => {
-        const date = this.formatDateTime(v.mtime);
-        const sizeKb = Math.max(1, Math.round((v.size || 0) / 1024));
-        const latest = (data.latest && v.file === data.latest) ? '<span class="badge-latest">Latest</span>' : '';
-        const vlabel = (v.version && Number.isInteger(v.version)) ? `v${v.version}` : '';
-        return `<li>
-          <div class="version-left">
-            <button class="version-item" data-id="${this.escapeHtml(v.file)}">${vlabel ? this.escapeHtml(vlabel) + ' · ' : ''}${this.escapeHtml(v.file)}</button>
-            <button class="icon-btn version-rename" title="Rename parsed file" data-id="${this.escapeHtml(v.file)}">✎</button>
-          </div>
-          <span class="meta">${latest} ${date} • ${sizeKb} KB</span>
-        </li>`;
-      }).join('');
-
-      const html = `
-        <div class="version-picker">
-          <div class="version-header">Parsed TXT Versions</div>
-          <ul class="version-list">${listItems}</ul>
-        </div>
-      `;
-
       const modal = new Modal();
-      modal.showHtml(`${name} — TXT`, html);
+      modal.showHtml(`${name} — TXT`, '');
       modal.setBackHandler(null);
 
       const bodyEl = document.getElementById('modalBody');
       if (bodyEl) {
+        // Build list via DOM APIs
+        const picker = this._createEl('div', { class: 'version-picker' });
+        picker.appendChild(this._createEl('div', { class: 'version-header', text: 'Parsed TXT Versions' }));
+        const listEl = this._createEl('ul', { class: 'version-list' });
+        versions.forEach(v => {
+          const li = this._createEl('li');
+          const left = this._createEl('div', { class: 'version-left' });
+          const vlabel = (v.version && Number.isInteger(v.version)) ? `v${v.version}` : '';
+          const btn = this._createEl('button', { class: 'version-item', 'data-id': v.file });
+          btn.textContent = vlabel ? `${vlabel} · ${v.file}` : v.file;
+          const rn = this._createEl('button', { class: 'icon-btn version-rename', title: 'Rename parsed file', 'data-id': v.file }); rn.textContent = '✎';
+          left.appendChild(btn); left.appendChild(rn);
+          const meta = this._createEl('span', { class: 'meta' });
+          const latestText = (data.latest && v.file === data.latest) ? 'Latest ' : '';
+          const date = this.formatDateTime(v.mtime);
+          const sizeKb = Math.max(1, Math.round((v.size || 0) / 1024));
+          meta.textContent = `${latestText}${date} • ${sizeKb} KB`;
+          li.appendChild(left); li.appendChild(meta);
+          listEl.appendChild(li);
+        });
+        picker.appendChild(listEl);
+        bodyEl.innerHTML = '';
+        bodyEl.appendChild(picker);
+
         // Prefetch parsed content for listed versions to make first click instant
         try {
-          const ids = Array.from(bodyEl.querySelectorAll('.version-item'))
-            .map(b => b.getAttribute('data-id'))
-            .filter(Boolean);
+          const ids = versions.map(v => v.file);
           this.prefetchParsedContentList(name, ids);
         } catch (_) {}
 
@@ -578,8 +567,7 @@ class DataManager {
         });
       }
     } catch (err) {
-      console.error(err);
-      notifications.show('Failed to load parsed versions', 'error');
+      Err.error('Failed to load parsed versions', err);
     }
   }
 
@@ -666,8 +654,7 @@ class DataManager {
       modal.show(name, content);
     } catch (error) {
       if (!cached) {
-        console.error('Failed to load log:', error);
-        notifications.show('Failed to load log', 'error');
+        Err.error('Failed to load log', error);
       }
     }
   }
@@ -682,7 +669,7 @@ class DataManager {
       const data = await response.json();
       cloudflareUrl = data.url ? `${data.url}/openrouter-cc` : '';
     } catch (error) {
-      console.error('Failed to fetch tunnel:', error);
+      Err.warn('Failed to fetch tunnel URL');
     }
 
     // Fetch local server port from /health to avoid using Cloudflare hostname/port
@@ -1077,8 +1064,7 @@ class ParserController {
       this.renderChips();
       
     } catch (error) {
-      console.error('Failed to load parser settings:', error);
-      notifications.show('Failed to load parser settings', 'error');
+      Err.error('Failed to load parser settings', error);
     }
   }
   
@@ -1251,8 +1237,7 @@ class ParserController {
       notifications.show(`Detected ${tags.length} tags`, 'success');
       
     } catch (error) {
-      console.error('Failed to detect tags:', error);
-      notifications.show('Failed to detect tags', 'error');
+      Err.error('Failed to detect tags', error);
     }
   }
 
@@ -1360,8 +1345,7 @@ class ParserController {
       }
       
     } catch (error) {
-      console.error('Error saving parser settings:', error);
-      notifications.show('Error saving settings', 'error');
+      Err.error('Error saving settings', error);
     }
   }
   
@@ -1389,8 +1373,7 @@ class ParserController {
       }
       
     } catch (error) {
-      console.error('Error rewriting logs:', error);
-      notifications.show('Error rewriting logs', 'error');
+      Err.error('Error rewriting logs', error);
     }
   }
 }
@@ -1502,7 +1485,7 @@ class UIController {
       }
       
     } catch (error) {
-      console.error('Error loading preferences:', error);
+      Err.warn('Error loading preferences');
     }
   }
 
@@ -1636,42 +1619,72 @@ class UIController {
 }
 
 
-window.copyText = copyText;
-window.closeModal = () => new Modal().hide();
-window.copyModal = async () => {
-  const content = document.getElementById('modalBody')?.textContent || '';
-  try {
-    await navigator.clipboard.writeText(content);
-    notifications.show('Copied to clipboard', 'success');
-  } catch (error) {
-    notifications.show('Failed to copy', 'error');
-  }
-};
-window.saveParserSettings = () => parserController.saveSettings();
-window.rewriteParsed = () => parserController.rewriteParsed();
-window.openWriteOptions = () => uiController.openRewriteOptions();
-window.closeWriteOptions = () => uiController.closeRewriteOptions();
-window.writeLatest = () => uiController.rewriteLatest();
-window.startCustomWriteSelection = () => uiController.startCustomRewriteSelection();
-window.toggleSelectAllLogs = () => uiController.toggleSelectAllLogs();
-window.rewriteSelectedLogs = () => uiController.rewriteSelectedLogs();
-window.cancelLogSelection = () => uiController.cancelLogSelection();
-window.toggleAllTags = () => parserController.toggleAllTags();
-window.clearAllTags = () => parserController.clearAllTags();
-window.detectTagsLatest = () => parserController.detectTagsLatest();
-window.detectTagsFromLogs = () => parserController.openTagDetectModal();
-window.closeTagDetect = () => parserController.closeTagDetectModal();
-window.confirmTagDetect = () => parserController.confirmTagDetect();
-window.selectAllTagDetect = () => parserController.selectAllTagDetect();
-window.clearAllTagDetect = () => parserController.clearAllTagDetect();
-window.addTagFromInput = () => {
-  const input = document.getElementById('newTagInput');
-  if (input) {
-    parserController.addTag(input.value);
-    input.value = '';
-  }
-};
-window.refreshAll = () => uiController.refreshAll();
+// Encapsulate global bindings to limit pollution
+function attachWindowBindings() {
+  Object.assign(window, {
+    copyText,
+    closeModal: () => new Modal().hide(),
+    copyModal: async () => {
+      const content = document.getElementById('modalBody')?.textContent || '';
+      try {
+        await navigator.clipboard.writeText(content);
+        notifications.show('Copied to clipboard', 'success');
+      } catch (error) {
+        notifications.show('Failed to copy', 'error');
+      }
+    },
+    saveParserSettings: () => parserController.saveSettings(),
+    rewriteParsed: () => parserController.rewriteParsed(),
+    openWriteOptions: () => uiController.openRewriteOptions(),
+    closeWriteOptions: () => uiController.closeRewriteOptions(),
+    writeLatest: () => uiController.rewriteLatest(),
+    startCustomWriteSelection: () => uiController.startCustomRewriteSelection(),
+    toggleSelectAllLogs: () => uiController.toggleSelectAllLogs(),
+    rewriteSelectedLogs: () => uiController.rewriteSelectedLogs(),
+    cancelLogSelection: () => uiController.cancelLogSelection(),
+    toggleAllTags: () => parserController.toggleAllTags(),
+    clearAllTags: () => parserController.clearAllTags(),
+    detectTagsLatest: () => parserController.detectTagsLatest(),
+    detectTagsFromLogs: () => parserController.openTagDetectModal(),
+    closeTagDetect: () => parserController.closeTagDetectModal(),
+    confirmTagDetect: () => parserController.confirmTagDetect(),
+    selectAllTagDetect: () => parserController.selectAllTagDetect(),
+    clearAllTagDetect: () => parserController.clearAllTagDetect(),
+    addTagFromInput: () => {
+      const input = document.getElementById('newTagInput');
+      if (input) {
+        parserController.addTag(input.value);
+        input.value = '';
+      }
+    },
+    refreshAll: () => uiController.refreshAll(),
+    toggleVisibilityById: (id, btn) => {
+      try {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const isHidden = el.style.display === 'none' || getComputedStyle(el).display === 'none';
+        el.style.display = isHidden ? 'block' : 'none';
+        if (btn && btn.setAttribute) btn.setAttribute('aria-expanded', String(isHidden));
+      } catch (_) {}
+    },
+    toggleHelp: (id, btn) => {
+      try {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const hidden = el.getAttribute('aria-hidden') !== 'false';
+        if (!hidden) {
+          el.setAttribute('aria-hidden', 'true');
+          el.classList.remove('show');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        } else {
+          el.setAttribute('aria-hidden', 'false');
+          el.classList.add('show');
+          if (btn) btn.setAttribute('aria-expanded', 'true');
+        }
+      } catch (_) {}
+    }
+  });
+}
 
 // Lightweight visibility toggle for inline help blocks
 window.toggleVisibilityById = (id, btn) => {
@@ -1712,6 +1725,7 @@ document.addEventListener('DOMContentLoaded', () => {
   dataManager = new DataManager();
   parserController = new ParserController();
   uiController = new UIController();
+  attachWindowBindings();
   
   Promise.all([
     dataManager.updateStats(),
