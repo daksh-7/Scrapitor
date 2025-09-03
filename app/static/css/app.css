@@ -1165,7 +1165,7 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   padding: var(--space-lg);
-  animation: fadeIn 0.2s var(--ease-smooth);
+  animation: fadeIn 0.12s var(--ease-smooth);
 }
 
 @keyframes fadeIn {
@@ -1200,7 +1200,7 @@ textarea:focus {
     0 0 40px rgba(0, 212, 255, 0.1);
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s var(--ease-expo);
+  animation: slideUp 0.15s var(--ease-expo);
   overflow: hidden;
 }
 

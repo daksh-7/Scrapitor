@@ -232,6 +232,12 @@ class NavigationController {
 
 
 class DataManager {
+  constructor() {
+    this.logJsonCache = new Map();           // name -> raw JSON text
+    this.parsedListCache = new Map();        // name -> parsed list response
+    this.parsedContentCache = new Map();     // `${name}|${id}` -> text
+    this._prefetchTimer = null;
+  }
   async updateStats(silent = false) {
     try {
       AppState.isLoading = true;
@@ -250,7 +256,10 @@ class DataManager {
         }
       }
       
-      this.renderLogs(data.logs || [], !silent);
+      const logs = data.logs || [];
+      this.renderLogs(logs, !silent);
+      // Prefetch common actions for snappier first-open
+      this.schedulePrefetch(logs);
       
     } catch (error) {
       console.error('Failed to update stats:', error);
@@ -382,7 +391,7 @@ class DataManager {
               stopAll(ev);
               const newName = (input.value || '').trim();
               if (!newName || newName === name) { cleanup(); return; }
-              try {
+            try {
                 const res = await fetch(`/logs/${encodeURIComponent(name)}/rename`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -390,6 +399,7 @@ class DataManager {
                 });
                 if (res.ok) {
                   notifications.show('Log renamed', 'success');
+                  dataManager.clearParsedCachesFor(name);
                   await dataManager.updateStats();
                 } else {
                   const err = await res.json().catch(() => ({}));
@@ -417,11 +427,17 @@ class DataManager {
     });
   }
 
-  async openParsedList(name) {
+  async openParsedList(name, useCache = true) {
     try {
-      const res = await fetch(`/logs/${encodeURIComponent(name)}/parsed`);
-      if (!res.ok) throw new Error('Failed to fetch parsed versions');
-      const data = await res.json();
+      let data;
+      if (useCache && this.parsedListCache.has(name)) {
+        data = this.parsedListCache.get(name);
+      } else {
+        const res = await fetch(`/logs/${encodeURIComponent(name)}/parsed`);
+        if (!res.ok) throw new Error('Failed to fetch parsed versions');
+        data = await res.json();
+        this.parsedListCache.set(name, data);
+      }
       const versions = Array.isArray(data.versions) ? data.versions : [];
       if (!versions.length) {
         notifications.show('No parsed TXT versions for this log yet', 'info');
@@ -455,20 +471,37 @@ class DataManager {
 
       const bodyEl = document.getElementById('modalBody');
       if (bodyEl) {
+        // Prefetch parsed content for listed versions to make first click instant
+        try {
+          const ids = Array.from(bodyEl.querySelectorAll('.version-item'))
+            .map(b => b.getAttribute('data-id'))
+            .filter(Boolean);
+          this.prefetchParsedContentList(name, ids);
+        } catch (_) {}
+
         bodyEl.querySelectorAll('.version-item').forEach(btn => {
           btn.addEventListener('click', async (e) => {
             const id = btn.getAttribute('data-id');
             if (!id) return;
+            const title = `${name} — ${id}`;
+            const cacheKey = `${name}|${id}`;
+            const cached = this.parsedContentCache.get(cacheKey);
+            if (cached) {
+              modal.show(title, cached);
+              modal.setBackHandler(() => { this.openParsedList(name, true); });
+            } else {
+              modal.show(title, 'Loading…');
+              modal.setBackHandler(() => { this.openParsedList(name, true); });
+            }
             try {
               const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
               if (!r.ok) throw new Error('Failed to load parsed content');
               const text = await r.text();
-              modal.show(`${name} — ${id}`, text);
-              modal.setBackHandler(() => {
-                this.openParsedList(name);
-              });
+              this.parsedContentCache.set(cacheKey, text);
+              modal.show(title, text);
+              modal.setBackHandler(() => { this.openParsedList(name, true); });
             } catch (err) {
-              notifications.show('Failed to load parsed content', 'error');
+              if (!cached) notifications.show('Failed to load parsed content', 'error');
             }
           });
         });
@@ -532,7 +565,9 @@ class DataManager {
                   return;
                 }
                 notifications.show('Parsed file renamed', 'success');
-                this.openParsedList(name);
+                // Clear caches for this log before re-opening
+                dataManager.clearParsedCachesFor(name);
+                this.openParsedList(name, false);
               } catch (_) {
                 notifications.show('Rename failed', 'error');
               } finally {
@@ -546,6 +581,20 @@ class DataManager {
       console.error(err);
       notifications.show('Failed to load parsed versions', 'error');
     }
+  }
+
+  async prefetchParsedContentList(name, ids) {
+    const tasks = (ids || []).map(id => async () => {
+      const key = `${name}|${id}`;
+      if (this.parsedContentCache.has(key)) return;
+      try {
+        const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(id)}`);
+        if (!r.ok) return;
+        const text = await r.text();
+        this._setCacheWithLimit(this.parsedContentCache, key, text, 80);
+      } catch (_) {}
+    });
+    await this._runLimited(tasks, 3);
   }
 
   formatDateTime(unixSeconds) {
@@ -602,16 +651,24 @@ class DataManager {
   }
   
   async openLog(name) {
+    const modal = new Modal();
+    const cached = this.logJsonCache.get(name);
+    if (cached) {
+      modal.show(name, cached);
+    } else {
+      modal.show(name, 'Loading…');
+    }
     try {
       const response = await fetch(`/logs/${encodeURIComponent(name)}`);
+      if (!response.ok) throw new Error('Fetch failed');
       const content = await response.text();
-      
-      const modal = new Modal();
+      this._setCacheWithLimit(this.logJsonCache, name, content, 50);
       modal.show(name, content);
-      
     } catch (error) {
-      console.error('Failed to load log:', error);
-      notifications.show('Failed to load log', 'error');
+      if (!cached) {
+        console.error('Failed to load log:', error);
+        notifications.show('Failed to load log', 'error');
+      }
     }
   }
   
@@ -712,6 +769,89 @@ class DataManager {
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
+  }
+  
+  schedulePrefetch(logs) {
+    try { if (this._prefetchTimer) clearTimeout(this._prefetchTimer); } catch (_) {}
+    const run = () => { try { this.prefetchForLogs(logs); } catch (_) {} };
+    if (typeof window !== 'undefined' && window.requestIdleCallback) {
+      window.requestIdleCallback(run, { timeout: 300 });
+    } else {
+      this._prefetchTimer = setTimeout(run, 50);
+    }
+  }
+  
+  async prefetchForLogs(logs) {
+    const JSON_COUNT = 10;
+    const PARSED_LIST_COUNT = 6;
+    const PARSED_CONTENT_PER_LOG = 1;
+    const LIMIT_JSON_CACHE = 50;
+    const LIMIT_PARSED_CONTENT_CACHE = 80;
+
+    const topLogs = (logs || []).slice(0, Math.max(JSON_COUNT, PARSED_LIST_COUNT));
+    const jsonTasks = topLogs.slice(0, JSON_COUNT).map(name => async () => {
+      if (this.logJsonCache.has(name)) return;
+      try {
+        const res = await fetch(`/logs/${encodeURIComponent(name)}`);
+        if (!res.ok) return;
+        const txt = await res.text();
+        this._setCacheWithLimit(this.logJsonCache, name, txt, LIMIT_JSON_CACHE);
+      } catch (_) {}
+    });
+    const listTasks = topLogs.slice(0, PARSED_LIST_COUNT).map(name => async () => {
+      let data = this.parsedListCache.get(name) || null;
+      try {
+        if (!data) {
+          const res = await fetch(`/logs/${encodeURIComponent(name)}/parsed`);
+          if (!res.ok) return;
+          data = await res.json();
+          this.parsedListCache.set(name, data);
+        }
+        const latest = data && data.latest;
+        if (latest && PARSED_CONTENT_PER_LOG > 0) {
+          const key = `${name}|${latest}`;
+          if (!this.parsedContentCache.has(key)) {
+            const r = await fetch(`/logs/${encodeURIComponent(name)}/parsed/${encodeURIComponent(latest)}`);
+            if (!r.ok) return;
+            const text = await r.text();
+            this._setCacheWithLimit(this.parsedContentCache, key, text, LIMIT_PARSED_CONTENT_CACHE);
+          }
+        }
+      } catch (_) {}
+    });
+    await this._runLimited([...jsonTasks, ...listTasks], 3);
+  }
+  
+  async _runLimited(tasks, concurrency = 3) {
+    const queue = tasks.slice();
+    const workers = new Array(Math.min(concurrency, queue.length)).fill(0).map(async () => {
+      while (queue.length) {
+        const task = queue.shift();
+        try { await task(); } catch (_) {}
+      }
+    });
+    await Promise.all(workers);
+  }
+  
+  _setCacheWithLimit(map, key, value, limit) {
+    try {
+      if (map.has(key)) map.delete(key);
+      map.set(key, value);
+      while (map.size > limit) {
+        const firstKey = map.keys().next().value;
+        map.delete(firstKey);
+      }
+    } catch (_) {}
+  }
+
+  clearParsedCachesFor(name) {
+    try { this.parsedListCache.delete(name); } catch (_) {}
+    try {
+      const prefix = `${name}|`;
+      for (const k of Array.from(this.parsedContentCache.keys())) {
+        if (k.startsWith(prefix)) this.parsedContentCache.delete(k);
+      }
+    } catch (_) {}
   }
 }
 
@@ -850,17 +990,14 @@ class Modal {
     } catch (_) {}
     
     modalEl.classList.remove('show');
-    
-    setTimeout(() => {
-      modalEl.style.display = 'none';
-      try {
-        const prev = modalEl._prevFocus;
-        if (prev && typeof prev.focus === 'function') {
-          prev.focus();
-        }
-        modalEl._prevFocus = null;
-      } catch (_) {}
-    }, 300);
+    modalEl.style.display = 'none';
+    try {
+      const prev = modalEl._prevFocus;
+      if (prev && typeof prev.focus === 'function') {
+        prev.focus();
+      }
+      modalEl._prevFocus = null;
+    } catch (_) {}
   }
   
   syntaxHighlight(json) {
@@ -1145,7 +1282,7 @@ class ParserController {
     const modal = document.getElementById('tagDetectModal');
     if (!modal) return;
     modal.classList.remove('show');
-    setTimeout(() => modal.style.display = 'none', 200);
+    modal.style.display = 'none';
   }
 
   selectAllTagDetect() {
@@ -1380,7 +1517,7 @@ class UIController {
     const modal = document.getElementById('writeModal');
     if (!modal) return;
     modal.classList.remove('show');
-    setTimeout(() => modal.style.display = 'none', 200);
+    modal.style.display = 'none';
   }
 
   async rewriteLatest() {
@@ -1591,19 +1728,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const style = document.createElement('style');
   style.textContent = `
     .fade-in-up {
-      animation: fadeInUp 0.5s var(--ease-expo) forwards;
+      animation: fadeInUp 0.2s var(--ease-expo) forwards;
     }
     
     .fade-in-scale {
-      animation: fadeInScale 0.3s var(--ease-bounce) forwards;
+      animation: fadeInScale 0.16s var(--ease-bounce) forwards;
     }
     
     .fade-in {
-      animation: fadeIn 0.3s var(--ease-smooth) forwards;
+      animation: fadeIn 0.16s var(--ease-smooth) forwards;
     }
     
     .pulse-once {
-      animation: pulseOnce 0.6s var(--ease-bounce);
+      animation: pulseOnce 0.25s var(--ease-bounce);
     }
     
     .spinning {
@@ -1611,11 +1748,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     .updating {
-      animation: pulse 0.3s var(--ease-smooth);
+      animation: pulse 0.16s var(--ease-smooth);
     }
     
     .copied {
-      animation: copiedPulse 0.5s var(--ease-bounce);
+      animation: copiedPulse 0.25s var(--ease-bounce);
     }
     
     @keyframes fadeInUp {
