@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import requests
 try:
@@ -107,7 +107,8 @@ _PARSER_SETTINGS_PATH = (BASE_DIR / "var/state/parser_settings.json").resolve()
 def _load_parser_settings() -> Dict[str, Any]:
     base = {
         "mode": str(CONFIG["parser"].get("mode", "default")),
-        "include_tags": list(CONFIG["parser"].get("include_tags", [])),
+        # include_tags are ephemeral; do not preload from config
+        "include_tags": [],
         "exclude_tags": list(CONFIG["parser"].get("exclude_tags", [])),
     }
     try:
@@ -128,11 +129,13 @@ def _load_parser_settings() -> Dict[str, Any]:
                     preset = str(disk.get("preset", "default")).lower()
                     if preset == "default":
                         disk["mode"] = "default"
-                        disk.setdefault("include_tags", [])
+                        # Clear include tags; they are not persisted
+                        disk["include_tags"] = []
                         disk.setdefault("exclude_tags", [])
                     else:
                         disk["mode"] = "custom"
-                        disk.setdefault("include_tags", disk.get("include_tags", []))
+                        # Clear include tags; they are not persisted
+                        disk["include_tags"] = []
                         disk.setdefault("exclude_tags", disk.get("omit_tags", []))
                 for k in ("mode","include_tags","exclude_tags"):
                     if k in disk:
@@ -238,11 +241,12 @@ def _parsed_output_dir_for(json_path: pathlib.Path) -> pathlib.Path:
     return (PARSED_ROOT / json_path.stem).resolve()
 
 
-def _build_parser_args(json_path: pathlib.Path) -> list[str]:
+def _build_parser_args(json_path: pathlib.Path, override: Optional[Dict] = None) -> list[str]:
     args = [sys.executable, str(pathlib.Path(__file__).parent / "parser" / "parser.py")]
-    mode = str(PARSER_SETTINGS.get("mode", "default")).lower()
-    include_tags = [str(x).strip() for x in PARSER_SETTINGS.get("include_tags", []) if str(x).strip()]
-    exclude_tags = [str(x).strip() for x in PARSER_SETTINGS.get("exclude_tags", []) if str(x).strip()]
+    settings = override or PARSER_SETTINGS
+    mode = str(settings.get("mode", "default")).lower()
+    include_tags = [str(x).strip() for x in settings.get("include_tags", []) if str(x).strip()]
+    exclude_tags = [str(x).strip() for x in settings.get("exclude_tags", []) if str(x).strip()]
     persona_name = ""
     if mode == "custom":
         if include_tags:
@@ -561,7 +565,7 @@ def create_app() -> Flask:
         global PARSER_SETTINGS
         if request.method == "POST":
             data = request.get_json(silent=True) or {}
-            mode = str(data.get("mode", PARSER_SETTINGS.get("mode", "default")).lower())
+            mode = str(data.get("mode", PARSER_SETTINGS.get("mode", "default"))).lower()
             if mode not in ("default", "custom"):
                 mode = "default"
 
@@ -572,20 +576,42 @@ def create_app() -> Flask:
                     return [str(s).strip() for s in v if str(s).strip()]
                 return []
 
-            include_tags = _norm_list(data.get("include_tags", PARSER_SETTINGS.get("include_tags", [])))
+            # Persist exclusions only; include tags are ephemeral
             exclude_tags = _norm_list(data.get("exclude_tags", PARSER_SETTINGS.get("exclude_tags", [])))
             PARSER_SETTINGS = {
                 "mode": mode,
-                "include_tags": include_tags,
+                "include_tags": [],
                 "exclude_tags": exclude_tags,
             }
             _save_parser_settings(PARSER_SETTINGS)
-        return jsonify(PARSER_SETTINGS)
+        # Never return persisted include_tags
+        resp = dict(PARSER_SETTINGS)
+        resp["include_tags"] = []
+        return jsonify(resp)
 
     @app.route("/parser-rewrite", methods=["POST"])
     def parser_rewrite():
         data = request.get_json(silent=True) or {}
         mode = str(data.get("mode", "all")).lower()
+        # Optional per-request parser overrides
+        parser_mode = str(data.get("parser_mode", PARSER_SETTINGS.get("mode", "default"))).lower()
+
+        def _norm_list(v):
+            if isinstance(v, str):
+                return [s.strip() for s in v.split(',') if s.strip()]
+            if isinstance(v, list):
+                return [str(s).strip() for s in v if str(s).strip()]
+            return []
+
+        include_override = _norm_list(data.get("include_tags", []))
+        exclude_override = _norm_list(data.get("exclude_tags", []))
+        override_settings = {
+            "mode": parser_mode,
+            "include_tags": include_override,
+            # Persisted exclusions still apply if none given in request
+            "exclude_tags": exclude_override if exclude_override else PARSER_SETTINGS.get("exclude_tags", []),
+        }
+
         files_in = data.get("files", [])
         if isinstance(files_in, list) and files_in:
             targets = [LOG_DIR / (f if f.endswith('.json') else f + '.json') for f in files_in]
@@ -597,7 +623,7 @@ def create_app() -> Flask:
         results = []
         for t in targets:
             try:
-                args = _build_parser_args(t)
+                args = _build_parser_args(t, override=override_settings)
                 res = subprocess.run(args, capture_output=True, text=True)
                 ok = res.returncode == 0
                 results.append({
@@ -661,7 +687,7 @@ def create_app() -> Flask:
 
         names = set()
         used = []
-        file_to_tags: dict[str, list[str]] = {}
+        file_to_tags: Dict[str, list[str]] = {}
         for target in targets:
             try:
                 data = json.loads(target.read_text(encoding='utf-8'))
@@ -680,7 +706,7 @@ def create_app() -> Flask:
             except Exception:
                 continue
 
-        tag_to_files: dict[str, list[str]] = {}
+        tag_to_files: Dict[str, list[str]] = {}
         for fname, tags in file_to_tags.items():
             for t in tags:
                 tag_to_files.setdefault(t, []).append(fname)

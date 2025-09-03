@@ -217,10 +217,15 @@ def process_json(
         if char_name_l not in include_only:
             inner_clean = ""
         else:
-            # Within the character block, keep only selected sub-tags (if any appear)
+            # Isolation rule: character content should exclude other included tags.
+            # 1) Remove any tags that are not included
             present = _present_tag_names(inner_clean)
             to_remove = {t for t in present if t.lower() not in include_only}
             for _tag in to_remove:
+                inner_clean = _remove_tag_blocks(inner_clean, _tag)
+            # 2) Also remove any other included tags (children) to avoid duplication
+            included_children = {t for t in present if t.lower() in include_only and t.lower() != char_name_l}
+            for _tag in included_children:
                 inner_clean = _remove_tag_blocks(inner_clean, _tag)
     else:
         # Omit selected tags within the block
@@ -248,8 +253,13 @@ def process_json(
                     sc_inner = ""
                 else:
                     present_sc = _present_tag_names(sc_inner)
+                    # Remove not-included tags
                     to_remove_sc = {t for t in present_sc if t.lower() not in include_only}
                     for _tag in to_remove_sc:
+                        sc_inner = _remove_tag_blocks(sc_inner, _tag)
+                    # Isolation: also remove other included tags nested inside Scenario
+                    included_sc = {t for t in present_sc if t.lower() in include_only and t.lower() != "scenario"}
+                    for _tag in included_sc:
                         sc_inner = _remove_tag_blocks(sc_inner, _tag)
             else:
                 # Omit inner tags first
@@ -272,8 +282,12 @@ def process_json(
                 inner2 = inner
                 # Apply same filtering rules to inner2
                 present = _present_tag_names(inner2)
+                # Remove not-included tags first
                 to_remove = {t for t in present if t.lower() not in include_only}
                 for _tag in to_remove:
+                    inner2 = _remove_tag_blocks(inner2, _tag)
+                # Isolation: also remove other included tags so this tag's output is exclusive
+                for _tag in {t for t in present if t.lower() in include_only and t.lower() != tag}:
                     inner2 = _remove_tag_blocks(inner2, _tag)
                 for _tag in (strip_tags or ()):  # type: ignore[func-returns-value]
                     inner2 = _strip_tag_markers(inner2, _tag)

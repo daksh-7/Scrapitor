@@ -926,21 +926,18 @@ class ParserController {
       const mode = settings.mode || 'default';
       this.updateModeDisplay(mode);
       
-      AppState.includeSet = new Set((settings.include_tags || []).map(t => String(t).toLowerCase()));
+      // Only persist exclusions; do not preload include tags or chips
+      AppState.includeSet = new Set();
       AppState.excludeSet = new Set((settings.exclude_tags || []).map(t => String(t).toLowerCase()));
-      AppState.allTags = new Set([...AppState.includeSet, ...AppState.excludeSet]);
-      AppState.allTags.add('first_message');
+      AppState.allTags = new Set();
       
       const tagControls = document.getElementById('tagControls');
       if (tagControls) {
         tagControls.style.display = mode === 'custom' ? 'block' : 'none';
       }
       
+      // Render (empty until user detects)
       this.renderChips();
-      
-      if (mode === 'custom' && AppState.allTags.size === 1) {
-        await this.detectTagsLatest();
-      }
       
     } catch (error) {
       console.error('Failed to load parser settings:', error);
@@ -977,9 +974,8 @@ class ParserController {
       
       if (AppState.includeSet.has(tag)) {
         chip.classList.add('include');
-      } else {
+      } else if (AppState.excludeSet.has(tag)) {
         chip.classList.add('exclude');
-        if (!AppState.excludeSet.has(tag)) AppState.excludeSet.add(tag);
       }
       
       chip.addEventListener('click', () => this.cycleTagState(tag, chip));
@@ -1095,13 +1091,19 @@ class ParserController {
       const data = await response.json();
       
       const tags = (data.tags || []).map(t => String(t).toLowerCase());
-      tags.forEach(tag => {
-        if (!AppState.allTags.has(tag)) {
-          AppState.allTags.add(tag);
-        }
-      });
-      
+      // Replace with only latest tags
+      AppState.allTags = new Set(tags);
       AppState.allTags.add('first_message');
+
+      // Save mappings for filtering
+      const byTag = data.by_tag || {};
+      const norm = {};
+      Object.keys(byTag).forEach(tag => {
+        norm[tag.toLowerCase()] = (byTag[tag] || []).map(f => String(f).toLowerCase());
+      });
+      AppState.tagToFilesLower = norm;
+      AppState.tagDetectScope = (data.files || []).map(n => String(n).toLowerCase());
+      AppState.tagDetectScopeOriginal = (data.files || []).slice();
       
       const tagControls = document.getElementById('tagControls');
       if (tagControls) {
@@ -1174,11 +1176,9 @@ class ParserController {
       const response = await fetch(`/parser-tags?files=${q}`);
       const data = await response.json();
       const tags = (data.tags || []).map(t => String(t).toLowerCase());
-      tags.forEach(tag => {
-        if (!AppState.allTags.has(tag)) {
-          AppState.allTags.add(tag);
-        }
-      });
+      // Replace with tags from selected logs only
+      AppState.allTags = new Set(tags);
+      AppState.allTags.add('first_message');
       // Save mappings to AppState for exclusive filtering
       // Normalize mappings to lower-case file names for robust matching
       const byTag = data.by_tag || {};
@@ -1204,7 +1204,7 @@ class ParserController {
     
     const payload = {
       mode,
-      include_tags: Array.from(AppState.includeSet),
+      // persist exclusions ONLY
       exclude_tags: Array.from(AppState.excludeSet)
     };
     
@@ -1229,13 +1229,19 @@ class ParserController {
   }
   
   async rewriteParsed() {
-    await this.saveSettings();
-    
     try {
+      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
+        .find(r => r.checked);
+      const parser_mode = modeRadio ? modeRadio.value : 'default';
       const response = await fetch('/parser-rewrite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'all' })
+        body: JSON.stringify({
+          mode: 'all',
+          parser_mode,
+          include_tags: Array.from(AppState.includeSet),
+          exclude_tags: Array.from(AppState.excludeSet)
+        })
       });
       
       if (response.ok) {
@@ -1379,13 +1385,19 @@ class UIController {
 
   async rewriteLatest() {
     this.closeRewriteOptions();
-    // Ensure latest include/exclude settings are persisted before writing
-    try { await parserController.saveSettings(); } catch (_) {}
     try {
+      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
+        .find(r => r.checked);
+      const parser_mode = modeRadio ? modeRadio.value : 'default';
       const res = await fetch('/parser-rewrite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'latest' })
+        body: JSON.stringify({
+          mode: 'latest',
+          parser_mode,
+          include_tags: Array.from(AppState.includeSet),
+          exclude_tags: Array.from(AppState.excludeSet)
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -1451,11 +1463,19 @@ class UIController {
       return;
     }
     try {
-      try { await parserController.saveSettings(); } catch (_) {}
+      const modeRadio = Array.from(document.querySelectorAll('input[name="parser_mode"]'))
+        .find(r => r.checked);
+      const parser_mode = modeRadio ? modeRadio.value : 'default';
       const res = await fetch('/parser-rewrite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'custom', files })
+        body: JSON.stringify({
+          mode: 'custom',
+          files,
+          parser_mode,
+          include_tags: Array.from(AppState.includeSet),
+          exclude_tags: Array.from(AppState.excludeSet)
+        })
       });
       if (res.ok) {
         const data = await res.json();
