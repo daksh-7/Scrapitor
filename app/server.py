@@ -65,6 +65,8 @@ def _load_config() -> Dict[str, Any]:
         "openrouter": {
             "url": os.getenv("OPENROUTER_URL", get("openrouter.url", "https://openrouter.ai/api/v1/chat/completions")),
             "api_key": os.getenv("OPENROUTER_API_KEY", get("openrouter.api_key", "")),
+            # Only use server-side API key when explicitly enabled for safety
+            "allow_server_api_key": str(os.getenv("ALLOW_SERVER_API_KEY", str(get("openrouter.allow_server_api_key", False)))).lower() in ("1", "true", "yes", "on"),
             "defaults": get("openrouter.defaults", {
                 "temperature": 1.0, "top_p": 1.0, "top_k": 0, "max_tokens": 1024
             }),
@@ -291,13 +293,21 @@ def _validate_payload(pl: dict) -> dict:
     return out
 
 def _auth_headers(client_auth: str) -> dict:
+    """Build upstream Authorization header with safe defaults.
+
+    - Prefer the client-provided Authorization header.
+    - Only fall back to a server-side API key if explicitly enabled via
+      ALLOW_SERVER_API_KEY=true (or config openrouter.allow_server_api_key).
+    - Never forward client tokens in non-standard headers.
+    """
     headers: Dict[str, str] = {}
-    if CONFIG["openrouter"]["api_key"]:
-        headers["Authorization"] = f"Bearer {CONFIG['openrouter']['api_key']}"
-        if client_auth:
-            headers["X-Original-Authorization"] = client_auth
-    elif client_auth:
+    client_auth = (client_auth or "").strip()
+    if client_auth:
         headers["Authorization"] = client_auth
+        return headers
+
+    if CONFIG["openrouter"].get("allow_server_api_key") and CONFIG["openrouter"].get("api_key"):
+        headers["Authorization"] = f"Bearer {CONFIG['openrouter']['api_key']}"
     return headers
 
 def _stream_back(payload: dict, headers: dict):
@@ -326,13 +336,18 @@ def create_app() -> Flask:
 
     # Allow cross-origin access (including Authorization header) so the
     # JanitorAI site or other tools can call the proxy via the Cloudflare URL.
-    # Cloudflared terminates TLS and forwards to us over HTTP, so we keep this
-    # permissive to avoid "localhost-only" behavior from browsers.
+    # Use configured origins (default: "*") to permit restriction if desired.
+    try:
+        allowed = CONFIG["server"].get("allowed_origins", ["*"])
+        if isinstance(allowed, str):
+            allowed = [allowed]
+    except Exception:
+        allowed = ["*"]
     CORS(
         app,
-        resources={r"/*": {"origins": "*"}},
+        resources={r"/*": {"origins": allowed}},
         allow_headers=["Content-Type", "Authorization"],
-        expose_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Type"],
         supports_credentials=False,
     )
 
@@ -374,6 +389,9 @@ def create_app() -> Flask:
             return jsonify({"error": str(e)}), 400
 
         headers = _auth_headers(client_auth)
+        # Fail fast if no Authorization available (prevents accidental credit usage patterns)
+        if "Authorization" not in headers:
+            return jsonify({"error": "Missing Authorization header. Provide your OpenRouter API key as an Authorization bearer token."}), 401
 
         if payload.get("stream"):
             gen = stream_with_context(_stream_back(payload, headers))
@@ -813,6 +831,8 @@ if __name__ == "__main__":
     # Show configuration summary
     log.info(f"Starting JanitorAI Proxy on port {LISTEN_PORT}")
     log.info(f"API key configured: {bool(CONFIG['openrouter']['api_key'])}")
+    if CONFIG["openrouter"].get("api_key") and not CONFIG["openrouter"].get("allow_server_api_key"):
+        log.info("Server API key present but disabled by default (ALLOW_SERVER_API_KEY=false). Requests must supply Authorization header.")
     log.info(f"Allowed origins: {CONFIG['server']['allowed_origins']}")
     
     app.run(host="0.0.0.0", port=LISTEN_PORT, threaded=True, debug=False)
