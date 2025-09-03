@@ -562,7 +562,7 @@ Write-Host "`r" -NoNewline
 
 if ($url -and $url.Trim()) {
     # Verify DNS/HTTP, and if it fails, restart cloudflared once and try again
-    if (-not (Test-CloudflaredUrl -Url $url -Retries 40 -DelayMs 500)) {
+    if (-not (Test-CloudflaredUrl -Url $url -Retries 60 -DelayMs 500)) {
         Write-ColorOutput "Tunnel URL failed DNS/HTTP check; restarting cloudflared once..." -Color Yellow
         try { if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) { Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue } } catch {}
         if (Test-Path $tunnelLogOut) { Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue }
@@ -616,7 +616,7 @@ if ($url -and $url.Trim()) {
         }
 
         # Verify the new URL as well
-        if ($url -and $url.Trim() -and -not (Test-CloudflaredUrl -Url $url -Retries 40 -DelayMs 500)) {
+        if ($url -and $url.Trim() -and -not (Test-CloudflaredUrl -Url $url -Retries 60 -DelayMs 500)) {
             $url = $null
         }
     }
@@ -659,6 +659,8 @@ if ($url -and $url.Trim()) {
     Write-Host ""
     Write-ColorOutput "SUCCESS! Proxy is running" -Color Green
     Write-Host ""
+    # Small grace period to allow DNS to propagate through local resolvers and caches
+    Start-Sleep -Seconds 3
     Write-Host "=== Configuration ==="
     Write-Host ""
     $apiUrl = if ($url -and $url.Trim()) { "$url/openrouter-cc" } else { "Unavailable" }
