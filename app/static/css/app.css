@@ -784,29 +784,13 @@ body::before {
   display: inline-block;
 }
 
-/* Compact, professional toolbar buttons */
-.action-bar {
-  display: flex;
-  gap: var(--space-sm);
-  align-items: center;
-  flex-wrap: wrap;
-}
-.action-bar .button,
-.action-bar .button-secondary {
-  border-radius: var(--radius-full);
-}
-.button-sm {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.1;
-}
-.button .btn-icon,
-.button-secondary .btn-icon {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  margin-right: 0.45rem;
-}
+/* Detect-from-logs list items: one per line for readability */
+#tagDetectList { max-height: 50vh; overflow-y: auto; }
+.detect-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border-subtle); }
+.detect-item:last-child { border-bottom: 0; }
+.detect-item input { flex: 0 0 auto; }
+
+/* (removed legacy compact button helpers in favor of toolbar-btn styles) */
 
 .input-group {
   display: flex;

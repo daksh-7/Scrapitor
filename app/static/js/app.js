@@ -21,6 +21,7 @@ const State = {
   logMeta: new Map(), // name -> {mtime, size}
   selectedLogs: new Set(),
   selectingLogs: false,
+  isRenaming: false,
   tagToFilesLower: {},
   tagDetectScope: [],
   refreshTimer: null,
@@ -280,9 +281,11 @@ class DataManager {
         const cur = parseInt(DOM.parsedTotal.textContent.replace(/,/g, '') || '0');
         if (cur !== data.parsed_total) this.animateCounter(DOM.parsedTotal, cur, data.parsed_total);
       }
-      this.renderLogs(!silent);
-      // Opportunistic prefetch to make first opens instant
-      this.schedulePrefetch(State.logs);
+      if (!State.isRenaming) {
+        this.renderLogs(!silent);
+        // Opportunistic prefetch to make first opens instant
+        this.schedulePrefetch(State.logs);
+      }
     } catch (error) {
       handleError('Failed to load data', error);
     }
@@ -433,7 +436,9 @@ class DataManager {
     if (DOM.toggleSelectAllBtn) {
       const count = State.selectedLogs.size;
       const total = State.logs.length;
-      DOM.toggleSelectAllBtn.textContent = count === total ? 'Deselect All' : 'Select All';
+      const lbl = DOM.toggleSelectAllBtn.querySelector('.btn-label');
+      const txt = count === total ? 'Deselect All' : 'Select All';
+      if (lbl) lbl.textContent = txt; else DOM.toggleSelectAllBtn.textContent = txt;
     }
   }
   
@@ -497,22 +502,90 @@ class DataManager {
   createVersionItem(logName, version, latest) {
     const isLatest = latest && version.file === latest;
     const meta = `${isLatest ? 'Latest ' : ''}${this.formatDate(version.mtime)} • ${Math.max(1, Math.round((version.size || 0) / 1024))} KB`;
-    
-    return createElement('li', {}, [
-      createElement('div', { class: 'version-left' }, [
-        createElement('button', {
-          class: 'version-item',
-          text: version.file,
-          onclick: () => this.openParsedContent(logName, version.file)
-        }),
-        createElement('button', {
-          class: 'icon-btn version-rename',
-          text: '✎',
-          onclick: e => this.renameParsedFile(e, logName, version.file)
-        })
-      ]),
-      createElement('span', { class: 'meta', text: meta })
+
+    const li = document.createElement('li');
+    const left = createElement('div', { class: 'version-left' }, [
+      createElement('button', {
+        class: 'version-item',
+        text: version.file,
+        onclick: () => this.openParsedContent(logName, version.file)
+      }),
+      createElement('button', {
+        class: 'icon-btn version-rename',
+        text: '✎',
+        onclick: e => this.startInlineParsedRename(e, li, logName, version.file)
+      })
     ]);
+    const right = createElement('span', { class: 'meta', text: meta });
+    li.appendChild(left);
+    li.appendChild(right);
+    return li;
+  }
+
+  startInlineParsedRename(e, itemEl, logName, fileName) {
+    e.stopPropagation();
+    const left = itemEl.querySelector('.version-left');
+    if (!left || left.querySelector('.inline-rename')) return;
+
+    State.isRenaming = true;
+    const elements = {
+      fileBtn: left.querySelector('.version-item'),
+      renameBtn: left.querySelector('.version-rename')
+    };
+    Object.values(elements).forEach(el => el && (el.style.display = 'none'));
+
+    const wrap = createElement('div', { class: 'inline-rename' });
+    const input = createElement('input', {
+      class: 'copy-input rename-input',
+      value: fileName,
+      style: 'flex:1'
+    });
+
+    const cleanup = () => {
+      left.removeChild(wrap);
+      Object.values(elements).forEach(el => el && (el.style.display = ''));
+      State.isRenaming = false;
+    };
+
+    const cancelBtn = createElement('button', {
+      class: 'toolbar-btn',
+      'data-action': 'cancel',
+      onclick: cleanup
+    });
+    cancelBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg><span class="btn-label">Cancel</span>';
+
+    const saveBtn = createElement('button', {
+      class: 'toolbar-btn toolbar-btn--accent',
+      'data-action': 'save',
+      onclick: async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === fileName) {
+          cleanup();
+          return;
+        }
+        try {
+          await api.post(`/logs/${encodeURIComponent(logName)}/parsed/rename`, { old: fileName, new: newName });
+          notifications.show('File renamed', 'success');
+          this.clearCachesFor(logName);
+          this.openParsedList(logName);
+        } catch (error) {
+          handleError(error.message);
+        }
+        cleanup();
+      }
+    });
+    saveBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M7 4v6h10V4"/></svg><span class="btn-label">Save</span>';
+
+    wrap.appendChild(input);
+    wrap.appendChild(cancelBtn);
+    wrap.appendChild(saveBtn);
+    left.appendChild(wrap);
+
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    input.onkeydown = evt => {
+      if (evt.key === 'Enter') wrap.querySelector('[data-action="save"]').click();
+      if (evt.key === 'Escape') wrap.querySelector('[data-action="cancel"]').click();
+    };
   }
   
   async openParsedContent(name, id) {
@@ -540,6 +613,7 @@ class DataManager {
     const left = item.querySelector('.log-left');
     if (!left || left.querySelector('.inline-rename')) return;
     
+    State.isRenaming = true;
     const elements = {
       name: left.querySelector('.log-filename'),
       txt: left.querySelector('.mini-txt-btn'),
@@ -547,6 +621,9 @@ class DataManager {
     };
     
     Object.values(elements).forEach(el => el && (el.style.display = 'none'));
+    // Temporarily disable opening the log while renaming
+    const originalOnClick = item.onclick;
+    item.onclick = null;
     
     const wrap = createElement('div', { class: 'inline-rename' });
     const input = createElement('input', { 
@@ -558,17 +635,25 @@ class DataManager {
     const cleanup = () => {
       left.removeChild(wrap);
       Object.values(elements).forEach(el => el && (el.style.display = ''));
+      // Restore the original click-to-open handler
+      item.onclick = originalOnClick;
+      State.isRenaming = false;
     };
     
+    // Prevent clicks within the rename UI from bubbling to the item
+    wrap.addEventListener('click', ev => ev.stopPropagation());
+    input.addEventListener('click', ev => ev.stopPropagation());
+
     wrap.appendChild(input);
-    wrap.appendChild(createElement('button', {
-      class: 'button button-secondary',
-      text: 'Cancel',
+    const cancelBtn = createElement('button', {
+      class: 'toolbar-btn',
+      'data-action': 'cancel',
       onclick: cleanup
-    }));
-    wrap.appendChild(createElement('button', {
-      class: 'button',
-      text: 'Save',
+    });
+    cancelBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg><span class="btn-label">Cancel</span>';
+    const saveBtn = createElement('button', {
+      class: 'toolbar-btn toolbar-btn--accent',
+      'data-action': 'save',
       onclick: async () => {
         const newName = input.value.trim();
         if (!newName || newName === name) {
@@ -585,14 +670,17 @@ class DataManager {
         }
         cleanup();
       }
-    }));
+    });
+    saveBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M7 4v6h10V4"/></svg><span class="btn-label">Save</span>';
+    wrap.appendChild(cancelBtn);
+    wrap.appendChild(saveBtn);
     
     left.appendChild(wrap);
     setTimeout(() => { input.focus(); input.select(); }, 0);
     
     input.onkeydown = e => {
-      if (e.key === 'Enter') wrap.querySelector('.button:not(.button-secondary)').click();
-      if (e.key === 'Escape') wrap.querySelector('.button-secondary').click();
+      if (e.key === 'Enter') wrap.querySelector('[data-action="save"]').click();
+      if (e.key === 'Escape') wrap.querySelector('[data-action="cancel"]').click();
     };
   }
   
@@ -913,7 +1001,9 @@ class UIController {
     localStorage.setItem('densityCompact', compact ? '1' : '0');
     
     if (DOM.toggleDensityBtn) {
-      DOM.toggleDensityBtn.textContent = compact ? 'Normal' : 'Compact';
+      const lbl = DOM.toggleDensityBtn.querySelector('.btn-label');
+      if (lbl) lbl.textContent = compact ? 'Normal' : 'Compact';
+      else DOM.toggleDensityBtn.textContent = compact ? 'Normal' : 'Compact';
       animate.scale(DOM.toggleDensityBtn);
     }
   }
