@@ -1161,6 +1161,19 @@ textarea:focus {
   counter-reset: step-counter;
 }
 
+/* Subtle glow highlight for important inputs */
+.copy-input.glow-highlight {
+  border-color: var(--border-interactive);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15), 0 0 24px rgba(0, 212, 255, 0.25);
+  animation: endpointGlow 1.2s var(--ease-smooth);
+}
+
+@keyframes endpointGlow {
+  0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.0); }
+  50% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.20), 0 0 24px rgba(0, 212, 255, 0.30); }
+  100% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.10), 0 0 20px rgba(0, 212, 255, 0.15); }
+}
+
 .setup-steps li {
   margin: var(--space-md) 0;
   position: relative;

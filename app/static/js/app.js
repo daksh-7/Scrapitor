@@ -28,6 +28,7 @@ const State = {
   tagToFilesLower: {},
   tagDetectScope: [],
   refreshTimer: null,
+  cloudflareHighlighted: false,
   // Parsed versions selection state (modal)
   parsedSelecting: false,
   parsedSelected: new Set(),
@@ -888,6 +889,12 @@ class DataManager {
     if (DOM.endpointCloudflare) {
       DOM.endpointCloudflare.value = cloudflareUrl || 'Not available';
       if (!silent) animate.pulse(DOM.endpointCloudflare);
+      // One-time glow highlight when a Cloudflare URL is first detected
+      if (!State.cloudflareHighlighted && cloudflareUrl) {
+        DOM.endpointCloudflare.classList.add('glow-highlight');
+        setTimeout(() => DOM.endpointCloudflare.classList.remove('glow-highlight'), 1500);
+        State.cloudflareHighlighted = true;
+      }
     }
     
     if (DOM.endpointLocal) {
