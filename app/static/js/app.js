@@ -7,7 +7,9 @@ const initDOMCache = () => {
     'notification', 'parser_mode_val', 'tagControls', 'tagChips', 'newTagInput',
     'toggleAllBtn', 'selectionToolbar', 'toggleSelectAllBtn', 'modalBackBtn',
     'tagDetectModal', 'tagDetectList', 'writeModal', 'refreshBtn', 'toggleSidebarBtn',
-    'toggleDensityBtn', 'totalLogs', 'parsedTotal'
+    'toggleDensityBtn', 'totalLogs', 'parsedTotal',
+    // Confirm modal elements
+    'confirmModal', 'confirmTitle', 'confirmMessage', 'confirmOkBtn', 'confirmCancelBtn', 'confirmOkText', 'confirmCancelText'
   ];
   ids.forEach(id => { DOM[id] = document.getElementById(id); });
 };
@@ -21,10 +23,15 @@ const State = {
   logMeta: new Map(), // name -> {mtime, size}
   selectedLogs: new Set(),
   selectingLogs: false,
+  selectionAction: 'write',
   isRenaming: false,
   tagToFilesLower: {},
   tagDetectScope: [],
   refreshTimer: null,
+  // Parsed versions selection state (modal)
+  parsedSelecting: false,
+  parsedSelected: new Set(),
+  parsedCurrent: '',
   caches: {
     json: new Map(),
     parsedList: new Map(),
@@ -75,15 +82,24 @@ const api = {
 
 // Simplified element creator
 const createElement = (tag, attrs = {}, children = []) => {
-  const el = document.createElement(tag);
+  const svgTags = new Set(['svg','path','rect','circle','line','polyline','polygon','g','defs','use']);
+  const isSvg = svgTags.has(String(tag).toLowerCase());
+  const el = isSvg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
   Object.entries(attrs).forEach(([k, v]) => {
-    if (k === 'class') el.className = v;
-    else if (k === 'text') el.textContent = v;
-    else if (k === 'html') el.innerHTML = v;
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else el.setAttribute(k, v);
+    if (k === 'class' || k === 'className') {
+      if (isSvg) el.setAttribute('class', v);
+      else el.className = v;
+    } else if (k === 'text') {
+      el.textContent = v;
+    } else if (k === 'html') {
+      el.innerHTML = v;
+    } else if (k.startsWith('on') && typeof v === 'function') {
+      el.addEventListener(k.slice(2), v);
+    } else {
+      el.setAttribute(k, v);
+    }
   });
-  children.forEach(c => c && el.appendChild(c));
+  (children || []).forEach(c => { if (c) el.appendChild(c); });
   return el;
 };
 
@@ -105,6 +121,40 @@ const animate = {
     setTimeout(() => el.classList.remove('spinning'), duration);
   }
 };
+
+// Themed confirmation dialog
+const Confirm = (() => {
+  let _resolver = null;
+  function show({ title = 'Confirm', message = '', confirmText = 'Confirm', cancelText = 'Cancel', danger = true } = {}) {
+    return new Promise(resolve => {
+      _resolver = resolve;
+      if (DOM.confirmTitle) DOM.confirmTitle.textContent = title;
+      if (DOM.confirmMessage) DOM.confirmMessage.textContent = message;
+      if (DOM.confirmOkText) DOM.confirmOkText.textContent = confirmText;
+      if (DOM.confirmCancelText) DOM.confirmCancelText.textContent = cancelText;
+      if (DOM.confirmOkBtn) DOM.confirmOkBtn.className = `toolbar-btn ${danger ? 'toolbar-btn--danger' : 'toolbar-btn--accent'}`;
+      if (DOM.confirmModal) {
+        DOM.confirmModal.style.display = 'flex';
+        requestAnimationFrame(() => DOM.confirmModal.classList.add('show'));
+      }
+      const onKey = (e) => {
+        if (e.key === 'Escape') doCancel();
+        if (e.key === 'Enter') doOk();
+      };
+      document.addEventListener('keydown', onKey, { once: true });
+      function doOk() { hide(); resolve(true); }
+      function doCancel() { hide(); resolve(false); }
+      Confirm._handlers = { doOk, doCancel };
+    });
+  }
+  function hide() {
+    if (DOM.confirmModal) {
+      DOM.confirmModal.classList.remove('show');
+      DOM.confirmModal.style.display = 'none';
+    }
+  }
+  return { show, hide, _handlers: {} };
+})();
 
 // Simplified cache manager
 class CacheManager {
@@ -181,6 +231,7 @@ const escapeHtml = text => {
   div.textContent = text;
   return div.innerHTML;
 };
+const pluralize = (n, singular, plural) => `${n} ${n === 1 ? singular : (plural || singular + 's')}`;
 
 // Simplified Modal class
 class Modal {
@@ -440,6 +491,10 @@ class DataManager {
       const txt = count === total ? 'Deselect All' : 'Select All';
       if (lbl) lbl.textContent = txt; else DOM.toggleSelectAllBtn.textContent = txt;
     }
+    const writeBtn = document.getElementById('writeSelectedBtn');
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    if (writeBtn) writeBtn.style.display = State.selectionAction === 'write' ? '' : 'none';
+    if (deleteBtn) deleteBtn.style.display = State.selectionAction === 'delete' ? '' : 'none';
   }
   
   async openLog(name) {
@@ -476,12 +531,46 @@ class DataManager {
       }
       
       const modal = new Modal();
-      const content = createElement('div', { class: 'version-picker' }, [
-        createElement('div', { class: 'version-header', text: 'Parsed TXT Versions' }),
-        createElement('ul', { class: 'version-list' }, 
-          versions.map(v => this.createVersionItem(name, v, data.latest))
-        )
-      ]);
+      State.parsedCurrent = name;
+      const controls = State.parsedSelecting
+        ? createElement('div', { class: 'action-bar', style: 'margin-bottom:.5rem; display:flex; justify-content:flex-end;' }, [
+            createElement('button', { class: 'toolbar-btn', onclick: () => this.selectAllParsed(name) }, [
+              createElement('svg', { class: 'btn-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' }, [
+                createElement('path', { d: 'M9 12l2 2 4-4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+                createElement('rect', { x: '3', y: '3', width: '18', height: '18', rx: '4' })
+              ]),
+              createElement('span', { class: 'btn-label', text: 'Select All' })
+            ]),
+            createElement('button', { class: 'toolbar-btn toolbar-btn--danger', onclick: () => this.deleteSelectedParsed(name) }, [
+              createElement('svg', { class: 'btn-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' }, [
+                createElement('path', { d: 'M3 6h18', 'stroke-linecap': 'round' }),
+                createElement('path', { d: 'M10 11v6M14 11v6' })
+              ]),
+              createElement('span', { class: 'btn-label', text: 'Delete Selected' })
+            ]),
+            createElement('button', { class: 'toolbar-btn', onclick: () => this.cancelParsedDelete() }, [
+              createElement('svg', { class: 'btn-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' }, [
+                createElement('path', { d: 'M6 6l12 12M18 6L6 18', 'stroke-linecap': 'round' })
+              ]),
+              createElement('span', { class: 'btn-label', text: 'Cancel' })
+            ])
+          ])
+        : createElement('div', { class: 'action-bar', style: 'margin-bottom:.5rem; display:flex; justify-content:flex-end;' }, [
+            createElement('button', { class: 'toolbar-btn toolbar-btn--danger', onclick: () => this.startParsedDelete(name) }, [
+              createElement('svg', { class: 'btn-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2' }, [
+                createElement('path', { d: 'M3 6h18', 'stroke-linecap': 'round' }),
+                createElement('path', { d: 'M10 11v6M14 11v6' })
+              ]),
+              createElement('span', { class: 'btn-label', text: 'Delete' })
+            ])
+          ]);
+
+      const list = createElement('ul', { class: 'version-list' }, 
+        versions.map(v => this.createVersionItem(name, v, data.latest))
+      );
+      const headerLeft = createElement('div', { class: 'version-header', text: 'Parsed TXT Versions' });
+      const bar = createElement('div', { class: 'version-bar' }, [headerLeft, controls]);
+      const content = createElement('div', { class: 'version-picker' }, [bar, list]);
       
       modal.show(`${name} — TXT`, '', true);
       DOM.modalBody.innerHTML = '';
@@ -504,12 +593,22 @@ class DataManager {
     const meta = `${isLatest ? 'Latest ' : ''}${this.formatDate(version.mtime)} • ${Math.max(1, Math.round((version.size || 0) / 1024))} KB`;
 
     const li = document.createElement('li');
+    const btnClass = State.parsedSelecting ? 'version-item selectable' : 'version-item';
+    const versionBtn = createElement('button', {
+      class: btnClass,
+      text: version.file
+    });
+    if (State.parsedSelecting) {
+      if (State.parsedSelected.has(version.file)) versionBtn.classList.add('active');
+      li.onclick = (e) => {
+        e.stopPropagation();
+        this.toggleParsedItem(version.file, versionBtn);
+      };
+    } else {
+      versionBtn.onclick = () => this.openParsedContent(logName, version.file);
+    }
     const left = createElement('div', { class: 'version-left' }, [
-      createElement('button', {
-        class: 'version-item',
-        text: version.file,
-        onclick: () => this.openParsedContent(logName, version.file)
-      }),
+      versionBtn,
       createElement('button', {
         class: 'icon-btn version-rename',
         text: '✎',
@@ -520,6 +619,62 @@ class DataManager {
     li.appendChild(left);
     li.appendChild(right);
     return li;
+  }
+
+  startParsedDelete(name) {
+    State.parsedSelecting = true;
+    State.parsedSelected.clear();
+    this.openParsedList(name);
+  }
+  cancelParsedDelete() {
+    State.parsedSelecting = false;
+    State.parsedSelected.clear();
+    if (State.parsedCurrent) this.openParsedList(State.parsedCurrent);
+  }
+  toggleParsedItem(file, versionBtn) {
+    if (State.parsedSelected.has(file)) {
+      State.parsedSelected.delete(file);
+      versionBtn.classList.remove('active');
+    } else {
+      State.parsedSelected.add(file);
+      versionBtn.classList.add('active');
+    }
+  }
+  selectAllParsed(name) {
+    const data = this.parsedListCache.get(name) || { versions: [] };
+    const all = (data.versions || []).map(v => v.file);
+    if (State.parsedSelected.size === all.length) {
+      State.parsedSelected.clear();
+    } else {
+      State.parsedSelected = new Set(all);
+    }
+    this.openParsedList(name);
+  }
+  async deleteSelectedParsed(name) {
+    const list = [...State.parsedSelected];
+    if (!list.length) {
+      notifications.show('No versions selected', 'info');
+      return;
+    }
+    const ok = await Confirm.show({
+      title: 'Delete Versions',
+      message: `Delete ${pluralize(list.length, 'version', 'versions')}? This cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const res = await api.post(`/logs/${encodeURIComponent(name)}/parsed/delete`, { files: list });
+      this.clearCachesFor(name);
+      State.parsedSelecting = false;
+      State.parsedSelected.clear();
+      await dataManager.openParsedList(name);
+      const count = Number(res?.deleted || list.length);
+      notifications.show(`Deleted ${pluralize(count, 'version', 'versions')}`, 'success');
+    } catch (error) {
+      handleError('Failed to delete versions', error);
+    }
   }
 
   startInlineParsedRename(e, itemEl, logName, fileName) {
@@ -1047,8 +1202,9 @@ class UIController {
     }
   }
   
-  startLogSelection() {
+  startLogSelection(action = 'write') {
     State.selectingLogs = true;
+    State.selectionAction = action;
     State.selectedLogs.clear();
     
     // Filter logs if in include mode with exclusive tags
@@ -1192,8 +1348,15 @@ const globalFunctions = {
   },
   startCustomWriteSelection: () => {
     globalFunctions.closeWriteOptions();
-    uiController.startLogSelection();
+    uiController.startLogSelection('write');
   },
+  confirmOk: () => {
+    if (Confirm._handlers?.doOk) Confirm._handlers.doOk();
+  },
+  confirmCancel: () => {
+    if (Confirm._handlers?.doCancel) Confirm._handlers.doCancel();
+  },
+  startDeleteSelection: () => uiController.startLogSelection('delete'),
   toggleSelectAllLogs: () => uiController.toggleSelectAll(),
   rewriteSelectedLogs: () => {
     const files = [...State.selectedLogs];
@@ -1202,6 +1365,35 @@ const globalFunctions = {
       return;
     }
     parserController.rewrite('custom', files);
+  },
+  deleteSelectedLogs: async () => {
+    const files = [...State.selectedLogs];
+    if (!files.length) {
+      notifications.show('No files selected', 'info');
+      return;
+    }
+    const ok = await Confirm.show({
+      title: 'Delete Logs',
+      message: `Delete ${pluralize(files.length, 'log', 'logs')}? This cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const res = await api.post('/logs/delete', { files });
+      const okFiles = (res.results || []).filter(r => r.ok).map(r => r.file);
+      okFiles.forEach(name => dataManager.clearCachesFor(name));
+      await dataManager.updateStats();
+      State.selectingLogs = false;
+      State.selectedLogs.clear();
+      dataManager.renderLogs();
+      dataManager.updateSelectionToolbar();
+      const count = Number(res?.deleted || okFiles.length);
+      notifications.show(`Deleted ${pluralize(count, 'log', 'logs')}`, 'success');
+    } catch (error) {
+      handleError('Failed to delete logs', error);
+    }
   },
   cancelLogSelection: () => {
     State.selectingLogs = false;

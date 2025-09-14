@@ -543,6 +543,85 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/logs/<name>/parsed/delete", methods=["POST"])
+    def delete_parsed_files(name: str):
+        """Delete one or more parsed .txt files for a given log."""
+        data = request.get_json(silent=True) or {}
+        files = data.get("files") or []
+        if isinstance(files, str):
+            files = [files]
+        files = [str(f).strip() for f in files if str(f).strip()]
+        if not files:
+            return jsonify({"deleted": 0, "results": [], "error": "no files provided"}), 400
+        safe = _safe_name(name)
+        stem = pathlib.Path(safe if safe.endswith('.json') else safe + '.json').stem
+        base_dir = _parsed_output_dir_for(LOG_DIR / f"{stem}.json")
+        results = []
+        deleted = 0
+        for fn in files:
+            try:
+                p = (base_dir / pathlib.Path(fn).name).resolve()
+                if base_dir not in p.parents or p.suffix.lower() != '.txt':
+                    results.append({"file": fn, "ok": False, "error": "invalid path"})
+                    continue
+                if p.exists() and p.is_file():
+                    p.unlink()
+                    deleted += 1
+                    results.append({"file": fn, "ok": True})
+                else:
+                    results.append({"file": fn, "ok": False, "error": "not found"})
+            except Exception as e:
+                results.append({"file": fn, "ok": False, "error": str(e)})
+        return jsonify({"deleted": deleted, "results": results})
+
+    @app.route("/logs/delete", methods=["POST"])
+    def delete_logs():
+        """Delete one or more activity log JSON files and their parsed directories."""
+        data = request.get_json(silent=True) or {}
+        files = data.get("files") or []
+        if isinstance(files, str):
+            files = [files]
+        files = [str(f).strip() for f in files if str(f).strip()]
+        if not files:
+            return jsonify({"deleted": 0, "results": [], "error": "no files provided"}), 400
+        results = []
+        deleted = 0
+        for raw in files:
+            try:
+                safe = _safe_name(raw)
+                if not safe.endswith('.json'):
+                    safe += '.json'
+                p = (LOG_DIR / safe).resolve()
+                if LOG_DIR not in p.parents:
+                    results.append({"file": raw, "ok": False, "error": "invalid path"})
+                    continue
+                # Delete JSON file
+                if p.exists() and p.is_file():
+                    p.unlink()
+                else:
+                    results.append({"file": raw, "ok": False, "error": "not found"})
+                    continue
+                # Delete parsed directory if present
+                try:
+                    parsed_dir = _parsed_output_dir_for(p)
+                    if parsed_dir.exists() and parsed_dir.is_dir():
+                        for sub in parsed_dir.glob("*"):
+                            try:
+                                sub.unlink()
+                            except Exception:
+                                pass
+                        try:
+                            parsed_dir.rmdir()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                deleted += 1
+                results.append({"file": raw, "ok": True})
+            except Exception as e:
+                results.append({"file": raw, "ok": False, "error": str(e)})
+        return jsonify({"deleted": deleted, "results": results})
+
     @app.route("/logs/<name>/rename", methods=["POST"])
     def rename_log(name: str):
         data = request.get_json(silent=True) or {}

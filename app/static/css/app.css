@@ -1345,7 +1345,11 @@ textarea:focus {
 /* Version picker styles shown inside modal */
 .version-picker {
   white-space: normal;
+  word-break: normal;
 }
+.version-bar { display:flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md); }
+.version-bar .action-bar { margin: 0; }
+.version-picker .toolbar-btn, .version-picker .btn-label { white-space: nowrap; }
 .version-header {
   font-weight: 700;
   color: var(--text-primary);
@@ -1362,6 +1366,11 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.version-item.selectable.active {
+  border-color: var(--accent-primary);
+  background: rgba(0, 212, 255, 0.08);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15), var(--shadow-sm);
 }
 .version-item {
   padding: 6px 10px;
