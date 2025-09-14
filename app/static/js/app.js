@@ -857,9 +857,11 @@ class ParserController {
     const sorted = [...State.allTags].sort();
     
     sorted.forEach((tag, i) => {
+      const tagKey = (tag || '').toLowerCase();
+      const display = tagKey === 'untagged content' ? 'Untagged Content' : tag;
       const chip = createElement('div', {
-        class: `tag-chip ${State.includeSet.has(tag) ? 'include' : State.excludeSet.has(tag) ? 'exclude' : ''}`,
-        text: tag,
+        class: `tag-chip ${State.includeSet.has(tagKey) ? 'include' : State.excludeSet.has(tagKey) ? 'exclude' : ''}`,
+        text: display,
         title: 'Click to toggle: Include ↔ Exclude',
         onclick: () => this.cycleTagState(tag, chip),
         onmouseenter: () => this.highlightFilesForTag(tag),
@@ -876,13 +878,14 @@ class ParserController {
   }
   
   cycleTagState(tag, chip) {
-    if (State.includeSet.has(tag)) {
-      State.includeSet.delete(tag);
-      State.excludeSet.add(tag);
+    const key = (tag || '').toLowerCase();
+    if (State.includeSet.has(key)) {
+      State.includeSet.delete(key);
+      State.excludeSet.add(key);
       chip.className = 'tag-chip exclude';
     } else {
-      State.excludeSet.delete(tag);
-      State.includeSet.add(tag);
+      State.excludeSet.delete(key);
+      State.includeSet.add(key);
       chip.className = 'tag-chip include';
     }
     animate.scale(chip);
@@ -966,6 +969,20 @@ class ParserController {
       if (files) payload.files = files;
       
       const data = await api.post('/parser-rewrite', payload);
+      // Clear caches for any logs that were rewritten so fresh lists/content are fetched next time
+      const rewritten = Array.isArray(data.results) ? data.results.map(r => r && r.file).filter(Boolean) : [];
+      rewritten.forEach(name => dataManager.clearCachesFor(name));
+      // If a parsed list modal is open for one of the rewritten logs, refresh it in place
+      try {
+        const modalOpen = DOM.logModal && DOM.logModal.classList.contains('show');
+        const title = DOM.modalTitle?.textContent || '';
+        if (modalOpen && title.includes(' — TXT')) {
+          const current = title.split(' — ')[0];
+          if (rewritten.includes(current)) {
+            await dataManager.openParsedList(current);
+          }
+        }
+      } catch {}
       notifications.show(`Wrote ${data.rewritten} file(s)`, 'success');
       
       if (State.selectingLogs) {

@@ -252,12 +252,15 @@ def _build_parser_args(json_path: pathlib.Path, override: Optional[Dict] = None)
     exclude_tags = [str(x).strip() for x in settings.get("exclude_tags", []) if str(x).strip()]
     persona_name = ""
     if mode == "custom":
+        # Always run in custom preset; choose include or omit flags accordingly
+        args += ["--preset", "custom"]
         if include_tags:
-            args += ["--preset", "custom", "--include-tags", ",".join(include_tags)]
+            args += ["--include-tags", ",".join(include_tags)]
         elif exclude_tags:
-            args += ["--preset", "custom", "--omit-tags", ",".join(exclude_tags)]
+            args += ["--omit-tags", ",".join(exclude_tags)]
         else:
-            args += ["--preset", "default"]
+            # Force include-only mode with an empty include set (include nothing)
+            args += ["--include-mode"]
     else:
         args += ["--preset", "default"]
     # Output routing and versioning
@@ -649,11 +652,12 @@ def create_app() -> Flask:
 
         include_override = _norm_list(data.get("include_tags", []))
         exclude_override = _norm_list(data.get("exclude_tags", []))
+        # Respect explicit empty lists from the client; only fall back if key absent
+        provided_exclude = ("exclude_tags" in data)
         override_settings = {
             "mode": parser_mode,
             "include_tags": include_override,
-            # Persisted exclusions still apply if none given in request
-            "exclude_tags": exclude_override if exclude_override else PARSER_SETTINGS.get("exclude_tags", []),
+            "exclude_tags": (exclude_override if provided_exclude else PARSER_SETTINGS.get("exclude_tags", [])),
         }
 
         files_in = data.get("files", [])
@@ -700,6 +704,42 @@ def create_app() -> Flask:
         - files: comma-separated list
         If none provided, falls back to latest.
         """
+        def _compile_tag_pair(name: str):
+            open_re = re.compile(rf"<\s*{re.escape(name)}\b[^>]*>", re.IGNORECASE)
+            close_re = re.compile(rf"</\s*{re.escape(name)}\s*>", re.IGNORECASE)
+            return open_re, close_re
+
+        def _remove_tag_blocks(text: str, name: str) -> str:
+            """Remove every <name>...</name> block, handling nesting. If not properly
+            closed, removes through end. Matches case-insensitively.
+            """
+            open_re, close_re = _compile_tag_pair(name)
+            pos = 0
+            while True:
+                m_open = open_re.search(text, pos)
+                if not m_open:
+                    break
+                start = m_open.start()
+                scan = m_open.end()
+                depth = 1
+                end_idx = len(text)
+                while depth > 0:
+                    m_next_open = open_re.search(text, scan)
+                    m_next_close = close_re.search(text, scan)
+                    if not m_next_close:
+                        end_idx = len(text)
+                        break
+                    if m_next_open and m_next_open.start() < m_next_close.start():
+                        depth += 1
+                        scan = m_next_open.end()
+                        continue
+                    depth -= 1
+                    scan = m_next_close.end()
+                    end_idx = scan
+                text = text[:start] + text[end_idx:]
+                pos = start
+            return text
+
         names_in = set()
         for n in request.args.getlist("file"):
             n = (n or "").strip()
@@ -742,9 +782,29 @@ def create_app() -> Flask:
                 tagset = set()
                 for m in re.finditer(r"<\s*([^<>/]+?)\s*>", content, re.IGNORECASE):
                     nm = m.group(1).strip()
-                    if nm:
-                        names.add(nm)
-                        tagset.add(nm)
+                    if not nm:
+                        continue
+                    # Normalize to the bare tag name (before any attributes)
+                    nm0 = nm.split()[0]
+                    if nm0:
+                        names.add(nm0)
+                        tagset.add(nm0)
+                # Detect untagged content: remove all detected tag blocks and any stray tag markers,
+                # then see if any non-whitespace remains.
+                if content:
+                    stripped = content
+                    for nm in list(tagset):
+                        try:
+                            stripped = _remove_tag_blocks(stripped, nm)
+                        except Exception:
+                            # Best-effort; continue if any edge case
+                            pass
+                    # Remove any remaining tag markers like <foo> or </foo>
+                    stripped = re.sub(r"</?[^<>/]+?[^<>]*>", "", stripped)
+                    # If anything other than whitespace remains, treat as 'Untagged Content'
+                    if stripped and stripped.strip():
+                        tagset.add('Untagged Content')
+                        names.add('Untagged Content')
                 used.append(target.name)
                 file_to_tags[target.name] = sorted({t.strip() for t in tagset if t.strip()}, key=lambda x: x.lower())
             except Exception:

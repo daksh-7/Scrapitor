@@ -203,11 +203,16 @@ def process_json(
 
     # Find first non-skipped tag in the original system content
     first = _find_first_non_skipped_tag(system_content, skip_for_name)
-    if not first:
-        print(f"[skip] {path.name}: no character tag found in system content")
-        return None
-    char_name, open_start, open_end = first
-    content_start_char, block_end_char, inner_raw = _extract_tag_content(system_content, char_name, open_end)
+    has_char_block = first is not None
+    if has_char_block:
+        char_name, open_start, open_end = first  # type: ignore[misc]
+        content_start_char, block_end_char, inner_raw = _extract_tag_content(system_content, char_name, open_end)
+    else:
+        # Fallback: no character tag found. Proceed with untagged/scenario/first message handling
+        char_name = "character"
+        open_start = open_end = -1
+        content_start_char = block_end_char = -1
+        inner_raw = ""
 
     # Clean per rules (apply removals/whitelist, normalize newlines)
     inner_clean = inner_raw
@@ -246,7 +251,7 @@ def process_json(
     if m_sc:
         sc_content_start, sc_block_end, sc_inner = _extract_tag_content(system_content, "scenario", m_sc.end())
         # Only add Scenario if it is outside the selected character block to avoid duplication
-        if not (content_start_char <= m_sc.start() < block_end_char):
+        if (not has_char_block) or (not (content_start_char <= m_sc.start() < block_end_char)):
             if include_only:
                 # Keep Scenario only if explicitly selected
                 if "scenario" not in include_only:
@@ -271,6 +276,32 @@ def process_json(
             for _tag in (strip_tags or ()):  # type: ignore[func-returns-value]
                 sc_inner = _strip_tag_markers(sc_inner, _tag)
             scenario_clean = _replace_literal_newlines(sc_inner).strip()
+
+    # Detect and extract any untagged content present in the first system message.
+    # This is any text outside of recognized <tag>...</tag> blocks.
+    untagged_clean = ""
+    try:
+        present_all = _present_tag_names(system_content)
+        stripped = system_content
+        for nm in list(present_all):
+            stripped = _remove_tag_blocks(stripped, nm)
+        # Remove any lingering tag markers like <foo> or </foo>
+        stripped = re.sub(r"</?[^<>/]+?[^<>]*>", "", stripped)
+        stripped = _replace_literal_newlines(stripped).strip()
+        if include_only is not None:
+            # Include only if explicitly selected
+            if "untagged content" in include_only:
+                untagged_clean = stripped
+            else:
+                untagged_clean = ""
+        else:
+            # Default mode: include unless explicitly omitted
+            if "untagged content" in omit_tags:
+                untagged_clean = ""
+            else:
+                untagged_clean = stripped
+    except Exception:
+        untagged_clean = ""
 
     # Include any other explicitly included top-level tags (e.g., userpersona)
     other_blocks: list[str] = []
@@ -307,8 +338,13 @@ def process_json(
     # In include-only mode, output ONLY explicitly included sections.
     out_lines: list[str] = []
     if include_only is not None:
+        # Untagged content always first if selected
+        if untagged_clean:
+            out_lines.append(untagged_clean)
         # Character block only if explicitly included
         if char_name_l in include_only and inner_clean:
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
             out_lines.append(inner_clean)
         # Other explicitly included top-level tags
         for blk in other_blocks:
@@ -328,7 +364,12 @@ def process_json(
             out_lines.extend(["First Message", "", assistant_first])
     else:
         # Default/omit mode: include everything except omitted pieces
+        # Untagged content always first if present
+        if untagged_clean:
+            out_lines.append(untagged_clean)
         if inner_clean:
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
             out_lines.append(inner_clean)
         for blk in other_blocks:
             if blk:
@@ -336,7 +377,7 @@ def process_json(
                     out_lines.append("")
                 out_lines.append(blk)
         if scenario_clean:
-            if inner_clean:
+            if out_lines and out_lines[-1] != "":
                 out_lines.append("")
             out_lines.append(scenario_clean)
         if assistant_first and include_first:
@@ -390,6 +431,8 @@ def _parse_args(argv: list[str]) -> tuple[list[pathlib.Path], set[str], set[str]
                         help="comma-separated tag names to include only (whitelist)")
     parser.add_argument("--strip-tags", dest="strip_tags", default="",
                         help="comma-separated tag names to unwrap (remove markers, keep content)")
+    parser.add_argument("--include-mode", dest="include_mode", action="store_true",
+                        help="force include-only mode even if no include-tags provided (includes nothing unless tags are explicitly listed)")
     parser.add_argument("--output-dir", dest="output_dir", default="",
                         help="directory to place parsed .txt outputs; defaults next to each JSON")
     parser.add_argument("--suffix", dest="suffix", default="",
@@ -445,6 +488,14 @@ def _parse_args(argv: list[str]) -> tuple[list[pathlib.Path], set[str], set[str]
         # Always keep persona tags out of name detection
         skip_for_name.add("persona")
         skip_for_name.add("userpersona")
+
+        # If explicitly forced into include-only mode and no include-tags were supplied,
+        # use an empty include set (include nothing unless later specified by name).
+        try:
+            if getattr(ns, 'include_mode', False) and include_only is None and not omit_tags:
+                include_only = set()
+        except Exception:
+            pass
 
     # Output options
     output_dir: Optional[pathlib.Path] = None
