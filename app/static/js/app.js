@@ -34,12 +34,7 @@ const State = {
   // Parsed versions selection state (modal)
   parsedSelecting: false,
   parsedSelected: new Set(),
-  parsedCurrent: '',
-  caches: {
-    json: new Map(),
-    parsedList: new Map(),
-    parsedContent: new Map()
-  }
+  parsedCurrent: ''
 };
 
 const Config = {
@@ -83,10 +78,11 @@ const api = {
   }
 };
 
+const SVG_TAGS = new Set(['svg','path','rect','circle','line','polyline','polygon','g','defs','use']);
+
 // Simplified element creator
 const createElement = (tag, attrs = {}, children = []) => {
-  const svgTags = new Set(['svg','path','rect','circle','line','polyline','polygon','g','defs','use']);
-  const isSvg = svgTags.has(String(tag).toLowerCase());
+  const isSvg = SVG_TAGS.has(String(tag).toLowerCase());
   const el = isSvg ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
   Object.entries(attrs).forEach(([k, v]) => {
     if (k === 'class' || k === 'className') {
@@ -233,12 +229,6 @@ const debounce = (fn, delay) => {
 };
 
 const formatNumber = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-const getRelativeTime = () => new Date().toTimeString().slice(0, 5);
-const escapeHtml = text => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
 const pluralize = (n, singular, plural) => `${n} ${n === 1 ? singular : (plural || singular + 's')}`;
 
 // Simplified Modal class
@@ -357,14 +347,18 @@ class DataManager {
       animate.pulse(el);
       return;
     }
-    const increment = end > start ? 1 : -1;
-    const stepTime = Math.max(10, Math.floor(duration / range));
-    let current = start;
+    const delta = end - start;
+    const steps = Math.max(1, Math.min(range, 60));
+    const stepTime = Math.max(16, Math.floor(duration / steps));
+    let step = 0;
     const timer = setInterval(() => {
-      current += increment;
-      el.textContent = formatNumber(current);
-      if (current === end) {
+      step += 1;
+      const progress = Math.min(1, step / steps);
+      const value = Math.round(start + delta * progress);
+      el.textContent = formatNumber(value);
+      if (progress >= 1) {
         clearInterval(timer);
+        el.textContent = formatNumber(end);
         animate.pulse(el);
       }
     }, stepTime);
@@ -990,9 +984,7 @@ class DataManager {
 
 // Parser controller (simplified)
 class ParserController {
-  constructor() {
-    this.tagDetectSelection = new Set();
-  }
+  constructor() {}
   
   async loadSettings() {
     try {
@@ -1089,8 +1081,16 @@ class ParserController {
   
   async detectTags(mode = 'latest', files = null) {
     try {
-      const url = mode === 'latest' ? '/parser-tags?mode=latest' : 
-                  `/parser-tags?files=${encodeURIComponent(files.join(','))}`;
+      const params = new URLSearchParams();
+      if (mode === 'latest') {
+        params.set('mode', 'latest');
+      } else if (Array.isArray(files)) {
+        files.forEach(name => {
+          if (name) params.append('file', name);
+        });
+      }
+      const qs = params.toString();
+      const url = qs ? `/parser-tags?${qs}` : '/parser-tags';
       const data = await api.getJson(url);
       
       const tags = (data.tags || []).map(t => t.toLowerCase());

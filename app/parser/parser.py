@@ -10,7 +10,11 @@ from typing import Optional, Tuple
 import pathlib as _pathlib  # alias to avoid confusion
 
 
-LOGS_DIR = pathlib.Path("logs")
+_APP_ROOT = pathlib.Path(__file__).resolve().parent.parent
+_DEFAULT_LOGS_DIR = (_APP_ROOT / "var/logs").resolve()
+LOGS_DIR = _DEFAULT_LOGS_DIR
+if not LOGS_DIR.exists():
+    LOGS_DIR = pathlib.Path("logs").resolve()
 
 # Default tags to skip while finding the first character tag (name-only logic)
 # These are not removals, only used to avoid picking a non-character tag name.
@@ -513,6 +517,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     done = 0
+    had_error = False
     for t in targets:
         try:
             if process_json(
@@ -527,8 +532,13 @@ def main(argv: list[str] | None = None) -> None:
                 done += 1
         except Exception as exc:
             print(f"[ERR] {t.name}: {exc}")
+            had_error = True
     if len(argv or []) != 1 and done:
         print(f"[SUMMARY] finished {done}/{len(targets)} files")
+
+    if had_error:
+        sys.exit(1)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

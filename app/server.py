@@ -52,12 +52,15 @@ def _load_config() -> Dict[str, Any]:
         except Exception:
             return default
 
+    raw_allowed = os.getenv("ALLOWED_ORIGINS", "") or ",".join(get("server.allowed_origins", ["*"]))
+    allowed_list = [origin.strip() for origin in raw_allowed.split(",") if origin.strip()]
+    if not allowed_list:
+        allowed_list = ["*"]
+
     return {
         "server": {
             "port": env("PROXY_PORT", get("server.port", 5000), int),
-            "allowed_origins": (
-                os.getenv("ALLOWED_ORIGINS", "") or ",".join(get("server.allowed_origins", ["*"]))
-            ).split(","),
+            "allowed_origins": allowed_list,
             "rate_limit": env("RATE_LIMIT", get("server.rate_limit", "60 per minute")),
             "connect_timeout": env("CONNECT_TIMEOUT", get("server.connect_timeout", 5.0), float),
             "read_timeout": env("READ_TIMEOUT", get("server.read_timeout", 300.0), float),
@@ -86,8 +89,24 @@ def _load_config() -> Dict[str, Any]:
 
 CONFIG = _load_config()
 
+_raw_level = CONFIG["logging"].get("level", logging.INFO)
+if isinstance(_raw_level, str):
+    name = _raw_level.strip()
+    level_value = getattr(logging, name.upper(), None)
+    if isinstance(level_value, int):
+        log_level = level_value
+    else:
+        try:
+            log_level = int(name)
+        except (TypeError, ValueError):
+            log_level = logging.INFO
+elif isinstance(_raw_level, int):
+    log_level = _raw_level
+else:
+    log_level = logging.INFO
+
 logging.basicConfig(
-    level=getattr(logging, CONFIG["logging"]["level"], logging.INFO),
+    level=log_level,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 log = logging.getLogger("proxy")
@@ -106,6 +125,7 @@ STARTED_EPOCH = time.time()
 
 # Parser settings (mutable at runtime, persisted under var/state)
 _PARSER_SETTINGS_PATH = (BASE_DIR / "var/state/parser_settings.json").resolve()
+_PARSER_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 def _load_parser_settings() -> Dict[str, Any]:
     base = {
@@ -242,6 +262,22 @@ def _next_version_suffix_for(json_path: pathlib.Path) -> str:
 def _parsed_output_dir_for(json_path: pathlib.Path) -> pathlib.Path:
     # Place versions under var/logs/parsed/<json_stem>/
     return (PARSED_ROOT / json_path.stem).resolve()
+
+
+def _resolve_log_path(name: str) -> Optional[pathlib.Path]:
+    raw = str(name or '').strip()
+    if not raw:
+        return None
+    candidate = raw if raw.endswith('.json') else f"{raw}.json"
+    path = (LOG_DIR / candidate)
+    try:
+        resolved = path.resolve(strict=False)
+        resolved.relative_to(LOG_DIR)
+    except Exception:
+        return None
+    if resolved.exists() and resolved.is_file():
+        return resolved
+    return None
 
 
 def _build_parser_args(json_path: pathlib.Path, override: Optional[Dict] = None) -> list[str]:
@@ -382,7 +418,10 @@ def create_app() -> Flask:
 
         # No mandatory server-side API key; client should supply Authorization header.
 
-        payload_in = request.get_json(silent=True) or {}
+        payload_in = request.get_json(silent=True)
+        if not isinstance(payload_in, dict):
+            return jsonify({"error": "Request body must be a JSON object"}), 400
+
         # fire-and-forget log write (synchronous but quick, no thread)
         _save_log(dict(payload_in))
 
@@ -740,9 +779,14 @@ def create_app() -> Flask:
         }
 
         files_in = data.get("files", [])
+        targets: list[pathlib.Path] = []
         if isinstance(files_in, list) and files_in:
-            targets = [LOG_DIR / (f if f.endswith('.json') else f + '.json') for f in files_in]
-            targets = [t for t in targets if t.exists() and t.is_file()]
+            seen: set[pathlib.Path] = set()
+            for raw in files_in:
+                resolved = _resolve_log_path(raw)
+                if resolved and resolved not in seen:
+                    targets.append(resolved)
+                    seen.add(resolved)
         else:
             files = sorted(LOG_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
             targets = files if mode != "latest" else (files[:1] if files else [])
