@@ -25,6 +25,8 @@ const State = {
   selectingLogs: false,
   selectionAction: 'write',
   isRenaming: false,
+  visibleLogs: [],
+  usingCustomLogList: false,
   tagToFilesLower: {},
   tagDetectScope: [],
   refreshTimer: null,
@@ -195,8 +197,13 @@ class NotificationManager {
     if (!this.queue.length) return;
     this.showing = true;
     const { message, type } = this.queue.shift();
-    
-    if (!DOM.notification) return;
+
+    if (!DOM.notification) {
+      this.showing = false;
+      this.queue.length = 0;
+      console.warn('Notification element not found; dropping queued notifications.');
+      return;
+    }
     const msgEl = DOM.notification.querySelector('.notification-message');
     const iconEl = DOM.notification.querySelector('.notification-icon');
     
@@ -365,41 +372,46 @@ class DataManager {
   
   renderLogs(animated = false) {
     if (!DOM.logs) return;
-    
+
     const filter = (DOM.logFilter?.value || '').toLowerCase();
-    const filtered = State.logs.filter(name => !filter || name.toLowerCase().includes(filter))
-      .slice(0, Config.MAX_LOGS);
-    
-    if (!filtered.length) {
-      DOM.logs.innerHTML = '<div class="empty-state"><p>Waiting for requests...</p></div>';
-      return;
-    }
-    
-    DOM.logs.innerHTML = '';
-    const fragment = document.createDocumentFragment();
-    
-    filtered.forEach((name, i) => {
-      const item = this.createLogItem(name, animated ? i : null);
-      fragment.appendChild(item);
-    });
-    
-    DOM.logs.appendChild(fragment);
+    const filtered = State.logs.filter(name => !filter || name.toLowerCase().includes(filter));
+    this._renderLogList(filtered, animated, false);
   }
 
   // Render from a provided list (used for selection filtering)
   renderLogsFrom(list, animated = false) {
     if (!DOM.logs) return;
-    const filtered = (list || []).slice(0, Config.MAX_LOGS);
-    if (!filtered.length) {
+    this._renderLogList(list || [], animated, true);
+  }
+
+  renderCurrentLogs(animated = false) {
+    if (State.usingCustomLogList) {
+      this.renderLogsFrom(State.visibleLogs, animated);
+    } else {
+      this.renderLogs(animated);
+    }
+  }
+
+  _renderLogList(list, animated, isCustom) {
+    if (!DOM.logs) return;
+    const display = (Array.isArray(list) ? list : []).slice(0, Config.MAX_LOGS);
+
+    State.visibleLogs = display;
+    State.usingCustomLogList = !!isCustom;
+
+    if (!display.length) {
       DOM.logs.innerHTML = '<div class="empty-state"><p>Waiting for requests...</p></div>';
       return;
     }
+
     DOM.logs.innerHTML = '';
     const fragment = document.createDocumentFragment();
-    filtered.forEach((name, i) => {
+
+    display.forEach((name, i) => {
       const item = this.createLogItem(name, animated ? i : null);
       fragment.appendChild(item);
     });
+
     DOM.logs.appendChild(fragment);
   }
   
@@ -486,10 +498,11 @@ class DataManager {
     DOM.selectionToolbar.style.display = State.selectingLogs ? 'flex' : 'none';
     
     if (DOM.toggleSelectAllBtn) {
-      const count = State.selectedLogs.size;
-      const total = State.logs.length;
+      const visible = Array.isArray(State.visibleLogs) ? State.visibleLogs : [];
+      const total = visible.length;
       const lbl = DOM.toggleSelectAllBtn.querySelector('.btn-label');
-      const txt = count === total ? 'Deselect All' : 'Select All';
+      const allVisibleSelected = total > 0 && visible.every(name => State.selectedLogs.has(name));
+      const txt = allVisibleSelected ? 'Deselect All' : 'Select All';
       if (lbl) lbl.textContent = txt; else DOM.toggleSelectAllBtn.textContent = txt;
     }
     const writeBtn = document.getElementById('writeSelectedBtn');
@@ -1240,15 +1253,27 @@ class UIController {
   }
   
   toggleSelectAll() {
-    if (!State.selectingLogs) return;
-    
-    if (State.selectedLogs.size === State.logs.length) {
+    if (!State.selectingLogs || !dataManager) return;
+
+    let visible = Array.isArray(State.visibleLogs) ? State.visibleLogs : [];
+    if (!visible.length && !State.usingCustomLogList && State.logs.length) {
+      visible = State.logs.slice(0, Config.MAX_LOGS);
+    }
+
+    if (!visible.length) {
+      dataManager.renderCurrentLogs();
+      dataManager.updateSelectionToolbar();
+      return;
+    }
+
+    const allSelected = visible.every(name => State.selectedLogs.has(name));
+    if (allSelected) {
       State.selectedLogs.clear();
     } else {
-      State.selectedLogs = new Set(State.logs);
+      State.selectedLogs = new Set(visible);
     }
-    
-    dataManager.renderLogs();
+
+    dataManager.renderCurrentLogs();
     dataManager.updateSelectionToolbar();
   }
 }
