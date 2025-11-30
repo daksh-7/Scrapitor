@@ -1,0 +1,30 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "scrapitor-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-30"
+
+# Uncomment to use D1 database (optional, for future history feature)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "scrapitor"
+# database_id = "your-database-id"
+
+# Uncomment to use R2 storage (optional, for future file storage)
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "scrapitor-files"
+
+[env.production]
+name = "scrapitor-api-production"
+vars = { ENVIRONMENT = "production" }
+
+[env.staging]
+name = "scrapitor-api-staging"
+vars = { ENVIRONMENT = "staging" }
+
+[build]
+command = "npm run build"
+
+# Enable TypeScript support
+[build.upload]
+format = "service-worker"

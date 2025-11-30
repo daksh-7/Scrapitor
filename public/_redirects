@@ -1,0 +1,10 @@
+# Cloudflare Pages Redirects
+
+# API proxying to Workers
+/api/*  https://scrapitor-api.your-domain.workers.dev/:splat  200
+/openrouter-cc  https://scrapitor-api.your-domain.workers.dev/openrouter-cc  200
+/chat/completions  https://scrapitor-api.your-domain.workers.dev/chat/completions  200
+/models  https://scrapitor-api.your-domain.workers.dev/models  200
+
+# SPA fallback
+/*  /index.html  200

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrapitor - Character Card Generator</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* Quick inline styles for character card UI */
+    .workflow-container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .workflow-step {
+      background: var(--bg-secondary, #2a2a2a);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-color, #3a3a3a);
+    }
+
+    .workflow-step h3 {
+      margin: 0 0 1rem 0;
+      color: var(--text-primary, #fff);
+      font-size: 1.25rem;
+    }
+
+    .workflow-step p {
+      margin: 0 0 1rem 0;
+      color: var(--text-secondary, #aaa);
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary, #fff);
+      font-weight: 500;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--bg-tertiary, #1a1a1a);
+      border: 1px solid var(--border-color, #3a3a3a);
+      border-radius: 6px;
+      color: var(--text-primary, #fff);
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .form-textarea {
+      min-height: 200px;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary, #4a9eff);
+    }
+
+    .btn-primary {
+      background: var(--accent-primary, #4a9eff);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover, #3a8eef);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .image-preview {
+      margin-top: 1rem;
+      text-align: center;
+    }
+
+    .mode-pills {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .mode-pill {
+      padding: 0.5rem 1rem;
+      background: var(--bg-tertiary, #1a1a1a);
+      border: 1px solid var(--border-color, #3a3a3a);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-pill input {
+      margin-right: 0.5rem;
+    }
+
+    .mode-pill input:checked + label {
+      border-color: var(--accent-primary, #4a9eff);
+    }
+
+    .header {
+      text-align: center;
+      padding: 2rem 1rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .header h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2.5rem;
+    }
+
+    .header p {
+      margin: 0;
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎴 Scrapitor</h1>
+    <p>Character Card Generator for SillyTavern</p>
+  </div>
+
+  <div class="workflow-container">
+    <!-- Step 1: Parser Config -->
+    <div class="workflow-step" id="cardStep1">
+      <h3>Step 1: Configure Parser</h3>
+      <p>Select how to extract character content from logs</p>
+
+      <div class="mode-pills">
+        <label class="mode-pill">
+          <input type="radio" name="card_parser_mode" value="default" checked>
+          <span>Default (Keep All)</span>
+        </label>
+        <label class="mode-pill">
+          <input type="radio" name="card_parser_mode" value="custom">
+          <span>Custom (Filter Tags)</span>
+        </label>
+      </div>
+
+      <div id="cardTagControls" style="display: none;">
+        <p style="font-size: 0.85rem; color: #888;">
+          Custom mode allows you to include/exclude specific tags. Configure tags in the main app, or use default settings.
+        </p>
+      </div>
+    </div>
+
+    <!-- Step 2: Select Log -->
+    <div class="workflow-step" id="cardStep2">
+      <h3>Step 2: Select Log</h3>
+      <p>Choose a conversation log to parse</p>
+
+      <div class="form-group">
+        <label class="form-label" for="cardLogSelector">Available Logs:</label>
+        <select id="cardLogSelector" class="form-select">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <button id="parseForCardBtn" class="btn-primary">Parse Selected Log</button>
+    </div>
+
+    <!-- Step 3: Preview -->
+    <div class="workflow-step" id="cardStep3">
+      <h3>Step 3: Preview & Edit</h3>
+      <p>Review and modify the extracted character content</p>
+
+      <div class="form-group">
+        <label class="form-label" for="cardCharacterName">Character Name:</label>
+        <input type="text" id="cardCharacterName" class="form-input" placeholder="Character">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="cardPreview">Character Content:</label>
+        <textarea id="cardPreview" class="form-textarea" placeholder="Parse a log to see content..."></textarea>
+      </div>
+    </div>
+
+    <!-- Step 4: Upload Image -->
+    <div class="workflow-step" id="cardStep4">
+      <h3>Step 4: Upload Character Image</h3>
+      <p>Select a PNG image to embed the character data into</p>
+
+      <div class="form-group">
+        <label class="form-label" for="cardImageUpload">Character Image (PNG):</label>
+        <input type="file" id="cardImageUpload" accept="image/png" class="form-input">
+      </div>
+
+      <div id="cardImagePreview" class="image-preview"></div>
+    </div>
+
+    <!-- Step 5: Generate -->
+    <div class="workflow-step" id="cardStep5">
+      <h3>Step 5: Generate Character Card</h3>
+      <p>Add metadata and generate your character card</p>
+
+      <div class="form-group">
+        <label class="form-label" for="cardTags">Tags (comma-separated):</label>
+        <input type="text" id="cardTags" class="form-input" placeholder="anime, cute, friendly">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="cardCreator">Creator Name:</label>
+        <input type="text" id="cardCreator" class="form-input" placeholder="Your Name" value="Scrapitor">
+      </div>
+
+      <button id="generateCardBtn" class="btn-primary">Generate & Download</button>
+
+      <p style="margin-top: 1.5rem; font-size: 0.85rem; color: #888;">
+        The generated PNG file will be compatible with SillyTavern, Agnaistic, and other frontends supporting Character Card V2 format.
+      </p>
+    </div>
+  </div>
+
+  <!-- Include required scripts -->
+  <script src="/js/png-handler.js"></script>
+  <script src="/js/character-card.js"></script>
+  <script src="/js/card-generator-ui.js"></script>
+
+  <!-- Notification system (optional, can reuse from main app) -->
+  <div id="notification" class="notification">
+    <span class="notification-icon">ℹ️</span>
+    <span class="notification-message"></span>
+  </div>
+
+  <style>
+    .notification {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--bg-secondary, #2a2a2a);
+      border: 1px solid var(--border-color, #3a3a3a);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 9999;
+    }
+
+    .notification.show {
+      display: flex;
+      opacity: 1;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .notification-icon {
+      font-size: 1.5rem;
+    }
+
+    .notification-message {
+      color: var(--text-primary, #fff);
+    }
+  </style>
+</body>
+</html>
