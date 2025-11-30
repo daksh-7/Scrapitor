@@ -11,18 +11,18 @@ jobs:
   deploy-workers:
     name: Deploy Workers API
     runs-on: ubuntu-latest
+    # Only run if secrets are configured
+    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: workers/package-lock.json
 
       - name: Install dependencies
         working-directory: workers
-        run: npm ci
+        run: npm install
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -35,6 +35,8 @@ jobs:
   deploy-pages:
     name: Deploy Pages Frontend
     runs-on: ubuntu-latest
+    # Only run if secrets are configured
+    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
