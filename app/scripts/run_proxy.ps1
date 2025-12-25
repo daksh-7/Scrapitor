@@ -49,29 +49,26 @@ function Test-PythonPath {
 # Resolve a usable Python interpreter without triggering Windows Store stubs
 function Get-UsablePython {
     param(
-        [Parameter(Mandatory = $true)][string]$VenvPython
+        [Parameter(Mandatory)] [string] $VenvPython
     )
+    
+    # Prefer existing venv
     if (Test-Path $VenvPython) { return $VenvPython }
-
+    
+    # Try py launcher (skips Windows Store stub)
     $pyCmd = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyCmd -and $pyCmd.Source -and ($pyCmd.Source -notmatch 'WindowsApps')) {
-        if (Test-PyLauncher) { return 'py' }
+    if ($pyCmd -and $pyCmd.Source -notmatch 'WindowsApps' -and (Test-PyLauncher)) {
+        return 'py'
     }
-    $pyCmdExe = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($pyCmdExe -and $pyCmdExe.Source -and ($pyCmdExe.Source -notmatch 'WindowsApps')) {
-        if (Test-PyLauncher) { return 'py' }
+    
+    # Try python/python3 directly
+    foreach ($name in @('python', 'python3')) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd -and $cmd.Source -notmatch 'WindowsApps' -and (Test-PythonPath $cmd.Source)) {
+            return $cmd.Source
+        }
     }
-
-    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($pythonCmd -and $pythonCmd.Source -and ($pythonCmd.Source -notmatch 'WindowsApps')) {
-        if (Test-PythonPath -PythonExe $pythonCmd.Source) { return $pythonCmd.Source }
-    }
-
-    $python3Cmd = Get-Command python3 -ErrorAction SilentlyContinue
-    if ($python3Cmd -and $python3Cmd.Source -and ($python3Cmd.Source -notmatch 'WindowsApps')) {
-        if (Test-PythonPath -PythonExe $python3Cmd.Source) { return $python3Cmd.Source }
-    }
-
+    
     return $null
 }
 
@@ -142,106 +139,120 @@ function Install-Cloudflared {
     return $false
 }
 
-# Offer a friendly exit confirmation at the end
-function Confirm-ExitPrompt {
-    while ($true) {
-        $ans = (Read-Host "confirm exit? y/n").Trim()
-        if ($ans -match '^(?i:y|yes)$') { break }
-        if ($ans -match '^(?i:n|no)$') { Write-Host "exit cancelled. this window will remain open." }
-    }
+# Wait for user acknowledgment before closing (for error cases)
+function Wait-ForClose {
+    Write-Host ""
+    Read-Host "Press Enter to close" | Out-Null
 }
 
-function Show-Progress {
-    param (
-        [int]$Seconds,
-        [string]$Message
-    )
-    
-    $spinChars = @("|", "/", "-", "\")
-    $startTime = Get-Date
-    $endTime = $startTime.AddSeconds($Seconds)
-    
-    Write-Host "$Message " -NoNewline
-    
-    $i = 0
-    while ((Get-Date) -lt $endTime) {
-        $char = $spinChars[$i % 4]
-        Write-Host "`r$Message $char" -NoNewline
-        Start-Sleep -Milliseconds 250
-        $i++
-    }
-    Write-Host "`r$Message [OK]" -ForegroundColor Green
-}
-
-# Resolve tunnel hostname without touching the OS resolver, to avoid negative DNS caching.
-function Test-DnsOverHttps {
+# Start a background process with optional console attachment
+function Start-BackgroundProcess {
     param(
-        [Parameter(Mandatory = $true)][string]$DnsHost,
-        [int]$Retries = 40,
-        [int]$DelayMs = 500
+        [Parameter(Mandatory)] [string] $FilePath,
+        [Parameter(Mandatory)] [string[]] $Arguments,
+        [string] $LogOut,
+        [string] $LogErr,
+        [switch] $AttachToConsole
     )
-
-    $okCloudflare = $false
-    $okGoogle = $false
-
-    for ($i = 0; $i -lt $Retries; $i++) {
-        $okCloudflare = $false
-        $okGoogle = $false
-
-        try {
-            $cfA = Invoke-RestMethod -Headers @{ Accept = 'application/dns-json' } -Uri ("https://cloudflare-dns.com/dns-query?name={0}&type=A" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
-            $cfAAAA = Invoke-RestMethod -Headers @{ Accept = 'application/dns-json' } -Uri ("https://cloudflare-dns.com/dns-query?name={0}&type=AAAA" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
-            if (($cfA.Status -eq 0 -and $cfA.Answer) -or ($cfAAAA.Status -eq 0 -and $cfAAAA.Answer)) { $okCloudflare = $true }
-        } catch { }
-
-        try {
-            $ggA = Invoke-RestMethod -Uri ("https://dns.google/resolve?name={0}&type=A" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
-            $ggAAAA = Invoke-RestMethod -Uri ("https://dns.google/resolve?name={0}&type=AAAA" -f $DnsHost) -TimeoutSec 5 -ErrorAction Stop
-            if (($ggA.Status -eq 0 -and $ggA.Answer) -or ($ggAAAA.Status -eq 0 -and $ggAAAA.Answer)) { $okGoogle = $true }
-        } catch { }
-
-        if ($okCloudflare -and $okGoogle) { return $true }
-        Start-Sleep -Milliseconds $DelayMs
+    
+    $params = @{
+        FilePath = $FilePath
+        ArgumentList = $Arguments
+        PassThru = $true
     }
-    return $false
+    
+    if ($LogOut) { $params.RedirectStandardOutput = $LogOut }
+    if ($LogErr) { $params.RedirectStandardError = $LogErr }
+    
+    if ($AttachToConsole) {
+        $params.NoNewWindow = $true
+    } else {
+        $params.WindowStyle = 'Hidden'
+    }
+    
+    return Start-Process @params
 }
 
-# Verify that the Cloudflare URL resolves (via DoH) and responds before publishing it.
-function Test-CloudflaredUrl {
-    param (
-        [Parameter(Mandatory = $true)] [string] $Url,
-        [int] $Retries = 40,
-        [int] $DelayMs = 500
+# Display contents of a log file with a header
+function Show-LogFile {
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string] $Label
     )
-
-    try { $uri = [Uri]$Url } catch { return $false }
-    $tunnelHost = $uri.Host
-
-    # 1) Wait for public resolvers (Cloudflare + Google) to have the record
-    if (-not (Test-DnsOverHttps -DnsHost $tunnelHost -Retries $Retries -DelayMs $DelayMs)) { return $false }
-
-    # 2) Small grace to let local resolvers catch up
-    Start-Sleep -Milliseconds 500
-
-    # 3) Verify HTTP from here (may use OS resolver, but after DoH is OK it should be published)
-    for ($i = 0; $i -lt $Retries; $i++) {
-        try {
-            $healthUrl = ($Url.TrimEnd('/') + '/health')
-            $resp = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-            if ($resp.StatusCode -eq 200) { return $true }
-        } catch {
-            try {
-                $resp2 = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-                if ($resp2.StatusCode -ge 200 -and $resp2.StatusCode -lt 500) { return $true }
-            } catch { }
+    
+    if (Test-Path $Path) {
+        $content = Get-Content $Path -ErrorAction SilentlyContinue
+        if ($content) {
+            Write-Host ""
+            Write-ColorOutput "${Label}:" -Color Yellow
+            $content | ForEach-Object { Write-Host "  $_" }
         }
-        Start-Sleep -Milliseconds $DelayMs
     }
-    return $false
+}
+
+
+# Wait for tunnel URL to appear in log files
+function Wait-ForTunnelUrl {
+    param(
+        [Parameter(Mandatory)] [string] $LogOut,
+        [Parameter(Mandatory)] [string] $LogErr,
+        [int] $TimeoutSeconds = 120,
+        [switch] $ShowProgress,
+        [System.Diagnostics.Process] $Process
+    )
+    
+    $startTime = Get-Date
+    $timeoutTime = $startTime.AddSeconds($TimeoutSeconds)
+    $lastSizeOut = 0
+    $lastSizeErr = 0
+    $urlPattern = 'https://[a-zA-Z0-9-]+\.trycloudflare\.com'
+    
+    while ((Get-Date) -lt $timeoutTime) {
+        # If the tunnel process already exited, don't wait out the full timeout.
+        if ($Process -and $Process.HasExited) {
+            if ($ShowProgress) { Write-Host "`r                              `r" -NoNewline }
+            return $null
+        }
+        # Check stdout
+        if (Test-Path $LogOut) {
+            $fileInfo = Get-Item $LogOut
+            if ($fileInfo.Length -gt $lastSizeOut) {
+                $content = Get-Content $LogOut -Raw -ErrorAction SilentlyContinue
+                $lastSizeOut = $fileInfo.Length
+                if ($content -match $urlPattern) {
+                    return $matches[0].Trim()
+                }
+            }
+        }
+        
+        # Check stderr
+        if (Test-Path $LogErr) {
+            $fileInfo = Get-Item $LogErr
+            if ($fileInfo.Length -gt $lastSizeErr) {
+                $content = Get-Content $LogErr -Raw -ErrorAction SilentlyContinue
+                $lastSizeErr = $fileInfo.Length
+                if ($content -match $urlPattern) {
+                    return $matches[0].Trim()
+                }
+            }
+        }
+        
+        if ($ShowProgress) {
+            $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds)
+            Write-Host "`rWaiting... $elapsed seconds" -NoNewline
+        }
+        
+        Start-Sleep -Milliseconds 500
+    }
+    
+    if ($ShowProgress) {
+        Write-Host "`r                              `r" -NoNewline
+    }
+    
+    return $null
 }
 
 # Create log directory if it doesn't exist
-$AppRoot = Split-Path $PSScriptRoot -Parent
 $VarDir = Join-Path $AppRoot 'var'
 $LogsDir = Join-Path $VarDir 'logs'
 $StateDir = Join-Path $VarDir 'state'
@@ -255,24 +266,6 @@ Write-Host ""
 Write-ColorOutput "====== Janitor Local Proxy ======" -Color Yellow
 Write-Host ""
 
-# Robust Ctrl+C handling: use a pure .NET handler to set a flag, then
-# poll it from the main loop and perform cleanup + confirm exit on the main thread.
-try {
-    Add-Type -Language CSharp -ErrorAction SilentlyContinue @"
-using System;
-public static class ScrapitorCancel
-{
-    public static volatile bool StopRequested = false;
-    public static void OnCancel(object sender, ConsoleCancelEventArgs e)
-    {
-        e.Cancel = true; // suppress default abrupt termination
-        StopRequested = true;
-    }
-}
-"@
-} catch {}
-try { $cancelHandler = [System.ConsoleCancelEventHandler]::new([ScrapitorCancel]::OnCancel) } catch { $cancelHandler = $null }
-if ($cancelHandler) { try { [Console]::add_CancelKeyPress($cancelHandler) | Out-Null } catch {} }
 
 # Resolve Python (prefer local venv, then py, then real python; avoid Windows Store stubs)
 $VenvPython   = Join-Path $AppRoot ".venv\Scripts\python.exe"
@@ -286,11 +279,12 @@ if (-not $UsePython) {
     Write-Host "Download Python (Windows): https://www.python.org/downloads/"
     Write-Host "Important: During setup, enable 'Add python.exe to PATH'."
     Write-Host "After installing, re-run Scrapitor using run.bat."
-    Confirm-ExitPrompt
+    Wait-ForClose
     return
 }
 
 # Ensure virtualenv exists (only after we confirmed Python is present)
+$VenvJustCreated = $false
 if (-not (Test-Path $VenvPython)) {
     Write-ColorOutput "Creating virtual environment (.venv)..." -Color Cyan
     $VenvPath = Join-Path $AppRoot '.venv'
@@ -301,15 +295,18 @@ if (-not (Test-Path $VenvPython)) {
     }
     if (-not (Test-Path $VenvPython)) {
         Write-ColorOutput "ERROR: Failed to create virtual environment" -Color Red
-        Confirm-ExitPrompt
+        Wait-ForClose
         return
     }
+    $VenvJustCreated = $true
 }
 
 # Upgrade pip and install requirements (quiet, concise)
 try {
     Write-ColorOutput "Checking dependencies..." -Color Cyan
-    $null = & $VenvPython -m pip install --disable-pip-version-check --no-color --upgrade pip setuptools wheel 2>$null
+    if ($VenvJustCreated) {
+        $null = & $VenvPython -m pip install --disable-pip-version-check --no-color --upgrade pip setuptools wheel 2>$null
+    }
     $Requirements = Join-Path $AppRoot 'requirements.txt'
     $pipOutput = & $VenvPython -m pip install --disable-pip-version-check --no-color -r $Requirements 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -330,7 +327,7 @@ try {
     if ($pipOutput) { $pipOutput | ForEach-Object { Write-Host "  $_" } } else { Write-Host $_ }
     Write-Host ""
     Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
-    Confirm-ExitPrompt
+    Wait-ForClose
     exit 1
 }
 
@@ -341,12 +338,42 @@ try {
     if (-not $envPort) { $envPort = [Environment]::GetEnvironmentVariable('PROXY_PORT', 'Machine') }
     if ($envPort) {
         $Port = [int]$envPort
-    } elseif (Test-Path 'config.yaml') {
-        $yaml = Get-Content 'config.yaml' -Raw -ErrorAction Stop
-        if ($yaml -match '(?ms)server:\s*.*?\bport\s*:\s*(\d+)') {
-            $Port = [int]$matches[1]
+    } else {
+        # Prefer app/config.yaml (matches Docker + docs), fall back to repo-root config.yaml.
+        $configCandidates = @(
+            (Join-Path $AppRoot 'config.yaml'),
+            (Join-Path $RepoRoot 'config.yaml'),
+            'config.yaml'
+        ) | Select-Object -Unique
+
+        $configPath = $null
+        foreach ($p in $configCandidates) {
+            if ($p -and (Test-Path $p)) { $configPath = $p; break }
+        }
+
+        if ($configPath) {
+            $yaml = Get-Content $configPath -Raw -ErrorAction Stop
+            if ($yaml -match '(?ms)server:\s*.*?\bport\s*:\s*(\d+)') {
+                $Port = [int]$matches[1]
+            }
         }
     }
+} catch { }
+
+# Ensure the Flask process uses the same port we use for health/tunnel checks.
+$env:PROXY_PORT = "$Port"
+
+# Optional timeout overrides (seconds)
+try {
+    $envTunnelTimeout = [Environment]::GetEnvironmentVariable('TUNNEL_TIMEOUT', 'Process')
+    if (-not $envTunnelTimeout) { $envTunnelTimeout = [Environment]::GetEnvironmentVariable('TUNNEL_TIMEOUT', 'User') }
+    if (-not $envTunnelTimeout) { $envTunnelTimeout = [Environment]::GetEnvironmentVariable('TUNNEL_TIMEOUT', 'Machine') }
+    if ($envTunnelTimeout) { $Timeout = [int]$envTunnelTimeout }
+
+    $envHealthTimeout = [Environment]::GetEnvironmentVariable('HEALTH_TIMEOUT', 'Process')
+    if (-not $envHealthTimeout) { $envHealthTimeout = [Environment]::GetEnvironmentVariable('HEALTH_TIMEOUT', 'User') }
+    if (-not $envHealthTimeout) { $envHealthTimeout = [Environment]::GetEnvironmentVariable('HEALTH_TIMEOUT', 'Machine') }
+    if ($envHealthTimeout) { $HealthTimeout = [int]$envHealthTimeout }
 } catch { }
 
 # Check if cloudflared is installed; if not, offer to install
@@ -385,50 +412,63 @@ if (-not (Test-Path (Join-Path $AppRoot "server.py"))) {
     exit 1
 }
 
-# Stop previous instances
-# Set this to $true to aggressively kill any running python/pythonw/cloudflared
-$ForceClean = $true
+# Stop previous instances of THIS app (not all Python processes!)
 try {
-    $killedProcesses = $false
-    # Cloudflared instances bound to our URL/port
-    $cfToKill = Get-CimInstance Win32_Process |
-        Where-Object { $_.Name -match '^cloudflared(\.exe)?$' -and $_.CommandLine -match "--url\s+http://localhost:$Port" }
-    foreach ($p in $cfToKill) {
-        Write-Host "  - Stopping cloudflared (PID: $($p.ProcessId))"
-        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
-        $killedProcesses = $true
+    $stoppedAny = $false
+    
+    # Stop cloudflared instances bound to our port
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^cloudflared(\.exe)?$' -and $_.CommandLine -match "--url\s+http://127\.0\.0\.1:$Port" } |
+        ForEach-Object {
+            Write-Host "  - Stopping previous cloudflared (PID: $($_.ProcessId))"
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            $stoppedAny = $true
+        }
+    
+    # Stop Python instances running our specific app from THIS repo's venv
+    $venvPyPattern = [regex]::Escape($VenvPython)
+    $venvPywPattern = [regex]::Escape($VenvPythonW)
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -match '^python(w)?(\.exe)?$' -and
+            $_.CommandLine -match '-m\s+app\.server' -and
+            (($_.CommandLine -match $venvPyPattern) -or ($_.CommandLine -match $venvPywPattern))
+        } |
+        ForEach-Object {
+            Write-Host "  - Stopping previous Flask (PID: $($_.ProcessId))"
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            $stoppedAny = $true
+        }
+    
+    # Also try PIDs from previous run
+    if (Test-Path $PidFile) {
+        Get-Content $PidFile -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_ -match '^\d+$') {
+                Stop-Process -Id ([int]$_) -Force -ErrorAction SilentlyContinue
+            }
+        }
+        Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
     }
-    # Python running app.py in this directory
-    $appPath = "-m app.server"
-    $pyToKill = Get-CimInstance Win32_Process |
-        Where-Object { ($_.Name -match '^python(w)?(\.exe)?$') -and ($_.CommandLine -match [regex]::Escape($appPath)) }
-    foreach ($p in $pyToKill) {
-        Write-Host "  - Stopping Flask (PID: $($p.ProcessId))"
-        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
-        $killedProcesses = $true
-    }
-    if ($killedProcesses) { Start-Sleep -Seconds 1 }
-    if ($ForceClean) {
-        Write-ColorOutput "Force cleaning any python/cloudflared instances..." -Color Yellow
-        Get-Process -Name python, pythonw, cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Milliseconds 500
-    }
-    if (Test-Path $PidFile) { try { Get-Content $PidFile | ForEach-Object { if ($_ -match '^\d+$') { Stop-Process -Id [int]$_ -Force -ErrorAction SilentlyContinue } } } catch {} ; Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
-} catch {}
+    
+    if ($stoppedAny) { Start-Sleep -Milliseconds 500 }
+} catch { }
 
 Write-ColorOutput "Starting Flask server on port $Port..." -Color Cyan
 
-# Start Flask in background using venv python (prefer windowless pythonw.exe)
+# Start Flask in background
 $env:PYTHONUNBUFFERED = "1"
-$flaskOut = [System.IO.Path]::GetTempFileName()
-$flaskErr = [System.IO.Path]::GetTempFileName()
-$flaskExe = $VenvPython
-if (-not $AttachChildrenToConsole -and (Test-Path $VenvPythonW)) { $flaskExe = $VenvPythonW }
-if ($AttachChildrenToConsole) {
-    $flaskProcess = Start-Process -FilePath $flaskExe -ArgumentList '-m','app.server' -PassThru -NoNewWindow -RedirectStandardOutput $flaskOut -RedirectStandardError $flaskErr
-} else {
-    $flaskProcess = Start-Process -FilePath $flaskExe -ArgumentList '-m','app.server' -PassThru -WindowStyle Hidden -RedirectStandardOutput $flaskOut -RedirectStandardError $flaskErr
-}
+$flaskOut = Join-Path $LogsDir 'flask.stdout.log'
+$flaskErr = Join-Path $LogsDir 'flask.stderr.log'
+try { Set-Content -Path $flaskOut -Value '' -NoNewline -Encoding utf8 } catch { }
+try { Set-Content -Path $flaskErr -Value '' -NoNewline -Encoding utf8 } catch { }
+$flaskExe = if ($AttachChildrenToConsole -or -not (Test-Path $VenvPythonW)) { $VenvPython } else { $VenvPythonW }
+
+$flaskProcess = Start-BackgroundProcess `
+    -FilePath $flaskExe `
+    -Arguments @('-m', 'app.server') `
+    -LogOut $flaskOut `
+    -LogErr $flaskErr `
+    -AttachToConsole:$AttachChildrenToConsole
 
 # Wait for health; try both 127.0.0.1 and localhost, and fall back to root
 $healthOk = $false
@@ -449,368 +489,159 @@ while (-not $healthOk -and ((Get-Date) - $startHealth).TotalSeconds -lt $HealthT
     if ($flaskProcess.HasExited) { break }
 }
 
-# If HTTP checks failed but Flask prints "Running on", consider healthy
-if (-not $healthOk) {
-    try {
-        $outC = if (Test-Path $flaskOut) { Get-Content $flaskOut -Raw -ErrorAction SilentlyContinue } else { "" }
-        $errC = if (Test-Path $flaskErr) { Get-Content $flaskErr -Raw -ErrorAction SilentlyContinue } else { "" }
-        if (($outC + "`n" + $errC) -match "Running on http://") { $healthOk = $true }
-    } catch { }
-}
-
 if (-not $healthOk) {
     Write-ColorOutput "ERROR: Flask server failed to start or /health not responding" -Color Red
     Write-Host "Check if port $Port is already in use or if there are import errors in app.server"
-    if (Test-Path $flaskOut) {
-        Write-ColorOutput "Flask stdout:" -Color Yellow
-        Get-Content $flaskOut -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
-    }
-    if (Test-Path $flaskErr) {
-        Write-ColorOutput "Flask stderr:" -Color Yellow
-        Get-Content $flaskErr -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" }
-    }
-    try { if ($flaskProcess -and !$flaskProcess.HasExited) { Stop-Process -Id $flaskProcess.Id -Force } } catch {}
+    Show-LogFile -Path $flaskOut -Label "Flask stdout"
+    Show-LogFile -Path $flaskErr -Label "Flask stderr"
+    if ($flaskProcess -and !$flaskProcess.HasExited) { Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue }
     Write-Host ""
     Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
-    Confirm-ExitPrompt
+    Wait-ForClose
     exit 1
 }
 
 Write-ColorOutput "Starting Cloudflare tunnel..." -Color Cyan
 
-# Create temporary files for cloudflared output
-$tunnelLogOut = [System.IO.Path]::GetTempFileName()
-$tunnelLogErr = [System.IO.Path]::GetTempFileName()
-
-# Start cloudflared with separate output redirection
+# Find cloudflared executable
 $cfExe = (Get-Command (Join-Path $PSScriptRoot "cloudflared.exe") -ErrorAction SilentlyContinue)
 if (-not $cfExe) { $cfExe = (Get-Command cloudflared -ErrorAction SilentlyContinue) }
 
-# Build robust cloudflared flags (IPv4 + QUIC + HA). Allow override via env CLOUDFLARED_FLAGS.
+# Build cloudflared arguments
 $cfFlags = $env:CLOUDFLARED_FLAGS
 if (-not $cfFlags -or [string]::IsNullOrWhiteSpace($cfFlags)) {
-    $cfFlags = "--edge-ip-version 4 --protocol quic --ha-connections 2 --loglevel info"
+    # Fast default: avoid HA + forced QUIC (can delay startup on some networks)
+    # Users can override via $env:CLOUDFLARED_FLAGS if they want different behavior.
+    # IMPORTANT: keep loglevel at info so the tunnel URL is printed (we parse it from logs).
+    $cfFlags = "--edge-ip-version 4 --loglevel info"
 }
 $cfArgList = @('tunnel','--no-autoupdate') + ($cfFlags -split '\s+') + @('--url', "http://127.0.0.1:$Port")
 
-if ($AttachChildrenToConsole) {
-    $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-        -ArgumentList $cfArgList `
-        -RedirectStandardOutput $tunnelLogOut `
-        -RedirectStandardError $tunnelLogErr `
-        -PassThru `
-        -NoNewWindow
-} else {
-    $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-        -ArgumentList $cfArgList `
-        -RedirectStandardOutput $tunnelLogOut `
-        -RedirectStandardError $tunnelLogErr `
-        -PassThru `
-        -WindowStyle Hidden
-}
-
-# Wait for the URL to appear in the log files
+# Try up to 2 attempts to start tunnel and verify URL
 $url = $null
-$startTime = Get-Date
-$timeoutTime = $startTime.AddSeconds($Timeout)
+$tunnelLogOut = $null
+$tunnelLogErr = $null
+$cloudflaredProcess = $null
+$MaxAttempts = 2
 
-Write-ColorOutput "Waiting for tunnel URL (timeout: ${Timeout}s)..." -Color Yellow
-
-# Monitor both log files for the URL
-$lastSizeOut = 0
-$lastSizeErr = 0
-while ((Get-Date) -lt $timeoutTime -and (-not $url)) {
-    # Check stdout
-    if (Test-Path $tunnelLogOut) {
-        $fileInfo = Get-Item $tunnelLogOut
-        if ($fileInfo.Length -gt $lastSizeOut) {
-            $content = Get-Content $tunnelLogOut -Raw -ErrorAction SilentlyContinue
-            $lastSizeOut = $fileInfo.Length
-            
-            # Try to match the URL
-            if ($content -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') {
-                $url = ("$($matches[0])").Trim()
-                if ($url) { break }
-            }
-        }
-    }
-    
-    # Check stderr
-    if (Test-Path $tunnelLogErr) {
-        $fileInfo = Get-Item $tunnelLogErr
-        if ($fileInfo.Length -gt $lastSizeErr) {
-            $content = Get-Content $tunnelLogErr -Raw -ErrorAction SilentlyContinue
-            $lastSizeErr = $fileInfo.Length
-            
-            # Try to match the URL
-            if ($content -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') {
-                $url = ("$($matches[0])").Trim()
-                if ($url) { break }
-            }
-        }
-    }
-    
-    # Show progress
-    $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds)
-    Write-Host "`rWaiting... $elapsed seconds" -NoNewline
-    
-    Start-Sleep -Milliseconds 500
-}
-
-Write-Host "`r                                    " -NoNewline
-Write-Host "`r" -NoNewline
-
-if ($url -and $url.Trim()) {
-    # Verify DNS/HTTP, and if it fails, restart cloudflared once and try again
-    if (-not (Test-CloudflaredUrl -Url $url -Retries 60 -DelayMs 500)) {
-        Write-ColorOutput "Tunnel URL failed DNS/HTTP check; restarting cloudflared once..." -Color Yellow
-        try { if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) { Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue } } catch {}
-        if (Test-Path $tunnelLogOut) { Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $tunnelLogErr) { Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue }
-
-        # Recreate temp logs
-        $tunnelLogOut = [System.IO.Path]::GetTempFileName()
-        $tunnelLogErr = [System.IO.Path]::GetTempFileName()
-
-        # Start cloudflared again
-        if ($AttachChildrenToConsole) {
-            $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-                -ArgumentList $cfArgList `
-                -RedirectStandardOutput $tunnelLogOut `
-                -RedirectStandardError $tunnelLogErr `
-                -PassThru `
-                -NoNewWindow
-        } else {
-            $cloudflaredProcess = Start-Process -FilePath $cfExe.Source `
-                -ArgumentList $cfArgList `
-                -RedirectStandardOutput $tunnelLogOut `
-                -RedirectStandardError $tunnelLogErr `
-                -PassThru `
-                -WindowStyle Hidden
-        }
-
-        # Wait again for URL
-        $url = $null
-        $startTime = Get-Date
-        $timeoutTime = $startTime.AddSeconds($Timeout)
-        $lastSizeOut = 0
-        $lastSizeErr = 0
-        while ((Get-Date) -lt $timeoutTime -and (-not $url)) {
-            if (Test-Path $tunnelLogOut) {
-                $fileInfo = Get-Item $tunnelLogOut
-                if ($fileInfo.Length -gt $lastSizeOut) {
-                    $content = Get-Content $tunnelLogOut -Raw -ErrorAction SilentlyContinue
-                    $lastSizeOut = $fileInfo.Length
-                    if ($content -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') { $url = ("$($matches[0])").Trim(); if ($url) { break } }
-                }
-            }
-            if (Test-Path $tunnelLogErr) {
-                $fileInfo = Get-Item $tunnelLogErr
-                if ($fileInfo.Length -gt $lastSizeErr) {
-                    $content = Get-Content $tunnelLogErr -Raw -ErrorAction SilentlyContinue
-                    $lastSizeErr = $fileInfo.Length
-                    if ($content -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') { $url = ("$($matches[0])").Trim(); if ($url) { break } }
-                }
-            }
-            Start-Sleep -Milliseconds 500
-        }
-
-        # Verify the new URL as well
-        if ($url -and $url.Trim() -and -not (Test-CloudflaredUrl -Url $url -Retries 60 -DelayMs 500)) {
-            $url = $null
-        }
-    }
-
-    if (-not ($url -and $url.Trim())) {
-        Write-ColorOutput "ERROR: Could not get tunnel URL within $Timeout seconds" -Color Red
-        if (Test-Path $tunnelLogOut) {
-            Write-Host ""
-            Write-ColorOutput "Cloudflared stdout:" -Color Yellow
-            Get-Content $tunnelLogOut | ForEach-Object { Write-Host "  $_" }
-        }
-        if (Test-Path $tunnelLogErr) {
-            Write-Host ""
-            Write-ColorOutput "Cloudflared stderr:" -Color Yellow
-            Get-Content $tunnelLogErr | ForEach-Object { Write-Host "  $_" }
-        }
-        Write-Host ""
-        Write-ColorOutput "Troubleshooting tips:" -Color Cyan
-        Write-Host "  - Check if port $Port is already in use"
-        Write-Host "  - Ensure cloudflared is correctly installed and in PATH"
-        Write-Host "  - Check your internet connection"
-        Write-Host "  - Try running the script as Administrator"
-        Write-Host "  - Check Windows Firewall settings"
-
-        if ($flaskProcess -and !$flaskProcess.HasExited) { Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue }
-        if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) { Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue }
-        # Keep temp logs so the user can scroll and inspect; cleanup will happen on exit confirmation
-        Write-Host ""
-        Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
-        Confirm-ExitPrompt
-        # Cleanup after confirmation
-        if (Test-Path $tunnelLogOut) { Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $tunnelLogErr) { Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
-        exit 1
-    }
-
-    Write-Host ""
-    Write-ColorOutput "SUCCESS! Proxy is running" -Color Green
-    Write-Host ""
-    # Small grace period to allow DNS to propagate through local resolvers and caches
-    Start-Sleep -Seconds 3
-    Write-Host "=== Configuration ==="
-    Write-Host ""
-    $apiUrl = if ($url -and $url.Trim()) { "$url/openrouter-cc" } else { "Unavailable" }
-    Write-Host "JanitorAI API URL: " -NoNewline
-    Write-ColorOutput "$apiUrl" -Color Green
-    Write-Host ""
-    Write-Host "Dashboard URL (Cloudflare): " -NoNewline
-    Write-ColorOutput "$url" -Color Green
-    if ($url -and $url.Trim()) { try { Start-Process $url } catch { } }
-    Write-Host "Dashboard URL (Local): " -NoNewline
-    Write-ColorOutput "http://localhost:$Port" -Color Green
-    Write-Host ""
-    Write-Host "=== Setup Instructions ==="
-    Write-Host "• Initiate a chat with the desired character on JanitorAI."
-    Write-Host "• Click 'using proxy'; under 'proxy', add a configuration and name it anything."
-    Write-Host "• For model name, paste: mistralai/mistral-small-3.2-24b-instruct:free"
-    Write-Host "• Paste the Cloudflare URL (copied above) under 'Proxy URL.'"
-    Write-Host "• Click 'Save changes' then 'Save Settings' and refresh the page."
-    Write-Host "• Enter any sample message (e.g., 'hi'); the app will then receive the model data."
-    Write-Host ""
-    Write-ColorOutput "Press Ctrl+C to stop the server when finished" -Color Yellow
-    Write-Host ""
-
-    # Persist tunnel URL for the UI/server to read
-    try {
-        Set-Content -Path (Join-Path $StateDir 'tunnel_url.txt') -Value $url -NoNewline -Encoding UTF8
-    } catch {}
-    try { Set-Content -Path $PidFile -Value @($flaskProcess.Id, $cloudflaredProcess.Id) -Encoding ascii } catch {}
-
-    # Register cleanup handler
-    $cleanupBlock = {
-        Write-Host "`n"
-        Write-ColorOutput "Stopping services..." -Color Yellow
-        
-        # Stop Flask
-        if ($flaskProcess -and !$flaskProcess.HasExited) {
-            Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue
-            Write-Host "  - Stopped Flask server"
-        }
-        
-        # Stop cloudflared
-        if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) {
-            Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
-            Write-Host "  - Stopped cloudflared tunnel"
-        }
-        
-        # Clean up any remaining processes
-        Get-Process -Name python, python3, cloudflared -ErrorAction SilentlyContinue | 
-            Stop-Process -Force -ErrorAction SilentlyContinue
-        
-        # Remove temp log files and persisted tunnel URL
-        if (Test-Path $tunnelLogOut) {
-            Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue
-        }
-        if (Test-Path $tunnelLogErr) {
-            Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue
-        }
-        $tunnelFile = Join-Path $StateDir 'tunnel_url.txt'
-        if (Test-Path $tunnelFile) { Remove-Item $tunnelFile -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
-        if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
-        
-        Write-ColorOutput "All processes stopped." -Color Green
-    }
-
-    # Register the cleanup script block
-    Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action $cleanupBlock | Out-Null
-
-    # Keep the script running
-    $didCleanup = $false
-    try {
-        while ($true) {
-            # Check if processes are still running
-            if ($flaskProcess.HasExited -or $cloudflaredProcess.HasExited) {
-                Write-ColorOutput "ERROR: One of the processes has stopped unexpectedly" -Color Red
-                & $cleanupBlock
-                Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
-                Confirm-ExitPrompt
-                exit 1
-            }
-
-            if ([ScrapitorCancel]::StopRequested) {
-                Write-ColorOutput "Stopping on user request..." -Color Yellow
-                & $cleanupBlock
-                $didCleanup = $true
-                try { if ($cancelHandler) { [Console]::remove_CancelKeyPress($cancelHandler) } } catch {}
-                Confirm-ExitPrompt
-                exit 0
-            }
-
-            Start-Sleep -Seconds 1
-        }
-    }
-    finally {
-        try { if ($cancelHandler) { [Console]::remove_CancelKeyPress($cancelHandler) } } catch {}
-        if (-not $didCleanup) {
-            & $cleanupBlock
-            Confirm-ExitPrompt
-        }
-    }
-} else {
-    Write-ColorOutput "ERROR: Could not get tunnel URL within $Timeout seconds" -Color Red
-    
-    # Show both cloudflared outputs for debugging
-    if (Test-Path $tunnelLogOut) {
-        Write-Host ""
-        Write-ColorOutput "Cloudflared stdout:" -Color Yellow
-        Get-Content $tunnelLogOut | ForEach-Object { 
-            Write-Host "  $_" 
-        }
-    }
-    
-    if (Test-Path $tunnelLogErr) {
-        Write-Host ""
-        Write-ColorOutput "Cloudflared stderr:" -Color Yellow
-        Get-Content $tunnelLogErr | ForEach-Object { 
-            Write-Host "  $_" 
-        }
-    }
-    
-    # Provide troubleshooting tips
-    Write-Host ""
-    Write-ColorOutput "Troubleshooting tips:" -Color Cyan
-    Write-Host "  - Check if port $Port is already in use"
-    Write-Host "  - Ensure cloudflared is correctly installed and in PATH"
-    Write-Host "  - Check your internet connection"
-    Write-Host "  - Try running the script as Administrator"
-    Write-Host "  - Check Windows Firewall settings"
-    
-    # Stop any running processes
-    if ($flaskProcess -and !$flaskProcess.HasExited) {
-        Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue
-    }
+for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    # Clean up previous attempt
     if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) {
         Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
     }
     
-    Write-Host ""
-    Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
-    Confirm-ExitPrompt
+    # Logs live under app/var/logs (same as server.py)
+    $tunnelLogOut = Join-Path $LogsDir 'cloudflared.stdout.log'
+    $tunnelLogErr = Join-Path $LogsDir 'cloudflared.stderr.log'
+    try { Set-Content -Path $tunnelLogOut -Value '' -NoNewline -Encoding utf8 } catch { }
+    try { Set-Content -Path $tunnelLogErr -Value '' -NoNewline -Encoding utf8 } catch { }
     
-    # Remove temp log files after confirmation
-    if (Test-Path $tunnelLogOut) {
-        Remove-Item $tunnelLogOut -Force -ErrorAction SilentlyContinue
+    if ($attempt -gt 1) {
+        Write-ColorOutput "Retrying tunnel (attempt $attempt of $MaxAttempts)..." -Color Yellow
     }
-    if (Test-Path $tunnelLogErr) {
-        Remove-Item $tunnelLogErr -Force -ErrorAction SilentlyContinue
+    
+    # Start cloudflared
+    $cloudflaredProcess = Start-BackgroundProcess `
+        -FilePath $cfExe.Source `
+        -Arguments $cfArgList `
+        -LogOut $tunnelLogOut `
+        -LogErr $tunnelLogErr `
+        -AttachToConsole:$AttachChildrenToConsole
+    
+    Write-ColorOutput "Waiting for tunnel URL (timeout: ${Timeout}s)..." -Color Yellow
+    
+    # Wait for URL
+    $url = Wait-ForTunnelUrl -LogOut $tunnelLogOut -LogErr $tunnelLogErr -TimeoutSeconds $Timeout -ShowProgress -Process $cloudflaredProcess
+    
+    if ($url) { break }
+
+    if ($cloudflaredProcess -and $cloudflaredProcess.HasExited) {
+        Write-ColorOutput "cloudflared exited before producing a URL (exit code: $($cloudflaredProcess.ExitCode))." -Color Red
+        Show-LogFile -Path $tunnelLogOut -Label "Cloudflared stdout"
+        Show-LogFile -Path $tunnelLogErr -Label "Cloudflared stderr"
+    } else {
+        Write-ColorOutput "No tunnel URL received" -Color Yellow
     }
-    if (Test-Path $flaskOut) { Remove-Item $flaskOut -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $flaskErr) { Remove-Item $flaskErr -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue }
+}
+
+# Define cleanup block (used by both success and failure paths)
+$cleanupBlock = {
+    if ($flaskProcess -and !$flaskProcess.HasExited) {
+        Stop-Process -Id $flaskProcess.Id -Force -ErrorAction SilentlyContinue
+        Write-Host "  - Stopped Flask server"
+    }
+    if ($cloudflaredProcess -and !$cloudflaredProcess.HasExited) {
+        Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
+        Write-Host "  - Stopped cloudflared tunnel"
+    }
+    # Clean up state files (keep logs in app/var/logs for debugging)
+    @($PidFile, (Join-Path $StateDir 'tunnel_url.txt')) |
+        Where-Object { $_ -and (Test-Path $_) } |
+        ForEach-Object { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
+}
+
+if (-not $url) {
+    # === FAILURE PATH ===
+    Write-ColorOutput "ERROR: Could not get tunnel URL within $Timeout seconds" -Color Red
+    Show-LogFile -Path $tunnelLogOut -Label "Cloudflared stdout"
+    Show-LogFile -Path $tunnelLogErr -Label "Cloudflared stderr"
+    Write-Host ""
+    Write-ColorOutput "Troubleshooting:" -Color Cyan
+    Write-Host "  - Check if port $Port is already in use"
+    Write-Host "  - Check your internet connection"
+    Write-Host "  - Check Windows Firewall settings"
+    Write-Host ""
+    & $cleanupBlock
+    Write-ColorOutput "The window will remain open so you can review the logs." -Color Yellow
+    Wait-ForClose
+    exit 1
+}
+
+# === SUCCESS PATH ===
+Write-Host ""
+Write-ColorOutput "SUCCESS! Proxy is running" -Color Green
+Write-Host ""
+Write-Host "=== Configuration ==="
+Write-Host ""
+Write-Host "JanitorAI API URL: " -NoNewline
+Write-ColorOutput "$url/openrouter-cc" -Color Green
+Write-Host ""
+Write-Host "Dashboard URL (Cloudflare): " -NoNewline
+Write-ColorOutput "$url" -Color Green
+Write-ColorOutput "Note: trycloudflare DNS may take a few seconds to propagate. If it doesn't resolve yet, wait and refresh." -Color Yellow
+Write-Host "Dashboard URL (Local): " -NoNewline
+Write-ColorOutput "http://localhost:$Port" -Color Green
+Write-Host ""
+Write-Host "=== Setup Instructions ==="
+Write-Host "• Initiate a chat with the desired character on JanitorAI."
+Write-Host "• Click 'using proxy'; under 'proxy', add a configuration and name it anything."
+Write-Host "• For model name, paste: mistralai/mistral-small-3.2-24b-instruct:free"
+Write-Host "• Paste the Cloudflare URL (copied above) under 'Proxy URL.'"
+Write-Host "• Click 'Save changes' then 'Save Settings' and refresh the page."
+Write-Host "• Enter any sample message (e.g., 'hi'); the app will then receive the model data."
+Write-Host ""
+Write-ColorOutput "Press Ctrl+C to stop the server when finished" -Color Yellow
+Write-Host ""
+
+# Persist tunnel URL and PIDs
+try { Set-Content -Path (Join-Path $StateDir 'tunnel_url.txt') -Value $url -NoNewline -Encoding UTF8 } catch {}
+try { Set-Content -Path $PidFile -Value @($flaskProcess.Id, $cloudflaredProcess.Id) -Encoding ascii } catch {}
+
+# Main loop - keep running until Ctrl+C or process exit
+try {
+    while ($true) {
+        if ($flaskProcess.HasExited -or $cloudflaredProcess.HasExited) {
+            Write-ColorOutput "ERROR: One of the processes has stopped unexpectedly" -Color Red
+            & $cleanupBlock
+            Wait-ForClose
+            exit 1
+        }
+        Start-Sleep -Seconds 1
+    }
+}
+finally {
+    Write-Host ""
+    Write-ColorOutput "Stopping..." -Color Yellow
+    & $cleanupBlock
+    Write-ColorOutput "Stopped." -Color Green
 }

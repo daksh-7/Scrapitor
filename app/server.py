@@ -28,13 +28,20 @@ except Exception:
 
 # ── config ───────────────────────────────────────────────────
 def _load_config() -> Dict[str, Any]:
-    cfg_path = pathlib.Path("config.yaml")
+    # Prefer config next to this file (Scrapitor/app/config.yaml) for consistent
+    # behavior regardless of the current working directory. Fall back to a
+    # CWD-level config.yaml for backward compatibility.
+    candidates = [
+        pathlib.Path(__file__).with_name("config.yaml"),
+        pathlib.Path("config.yaml"),
+    ]
+    cfg_path = next((p for p in candidates if p.exists()), None)
     file_cfg: Dict[str, Any] = {}
-    if cfg_path.exists() and yaml is not None:
+    if cfg_path is not None and yaml is not None:
         try:
             file_cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
         except Exception as e:
-            print(f"Warning: failed to load config.yaml: {e}")
+            print(f"Warning: failed to load {cfg_path}: {e}")
 
     def get(path, default):
         cur = file_cfg
