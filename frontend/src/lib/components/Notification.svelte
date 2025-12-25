@@ -32,11 +32,7 @@
     position: fixed;
     left: var(--space-lg);
     bottom: var(--space-lg);
-    background: linear-gradient(135deg, 
-      rgba(26, 29, 33, 0.95) 0%, 
-      rgba(18, 20, 23, 0.98) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: var(--surface-secondary);
     border: 1px solid var(--border-interactive);
     border-radius: var(--radius-md);
     padding: var(--space-md) var(--space-lg);
@@ -44,29 +40,24 @@
     gap: var(--space-md);
     align-items: center;
     opacity: 0;
-    transform: translateY(20px) scale(0.9);
-    transition: transform 0.3s var(--ease-bounce), opacity 0.3s var(--ease-bounce);
+    transform: translateY(20px);
+    transition: transform 0.15s ease-out, opacity 0.15s ease-out;
     pointer-events: none;
-    box-shadow: 
-      var(--shadow-xl),
-      0 0 30px rgba(0, 212, 255, 0.2);
     z-index: 2000;
   }
 
   .notification.show {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
     pointer-events: auto;
   }
 
   .notification.error {
-    border-color: rgba(255, 51, 102, 0.5);
-    box-shadow: var(--shadow-xl), 0 0 30px rgba(255, 51, 102, 0.2);
+    border-color: var(--accent-danger);
   }
 
   .notification.warning {
-    border-color: rgba(255, 170, 0, 0.5);
-    box-shadow: var(--shadow-xl), 0 0 30px rgba(255, 170, 0, 0.2);
+    border-color: var(--accent-warning);
   }
 
   .notification.info {
@@ -93,4 +84,3 @@
     font-size: 0.9375rem;
   }
 </style>
-

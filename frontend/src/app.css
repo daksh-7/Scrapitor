@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    Scrapitor Design System
-   Migrated from app/static/css/app.css
+   Optimized for performance
    ═══════════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -50,24 +50,15 @@
   --border-strong: rgba(255, 255, 255, 0.15);
   --border-interactive: rgba(0, 212, 255, 0.25);
 
-  /* ── Effects ─────────────────────────────────────────────── */
-  --glow-primary: 0 0 40px rgba(0, 212, 255, 0.15);
-  --glow-secondary: 0 0 40px rgba(0, 255, 136, 0.15);
-  --glow-intense: 0 0 60px rgba(0, 212, 255, 0.25);
-
   /* ── Shadows ─────────────────────────────────────────────── */
   --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 4px 8px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 8px 16px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.35);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.4);
-  --shadow-2xl: 0 32px 64px rgba(0, 0, 0, 0.45);
-  --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
 
   /* ── Easing ──────────────────────────────────────────────── */
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ── Spacing ─────────────────────────────────────────────── */
   --space-xs: 0.25rem;
@@ -89,7 +80,7 @@
 
 /* ── Body ─────────────────────────────────────────────────── */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-secondary);
@@ -104,53 +95,7 @@ body {
   overflow-x: hidden;
   position: relative;
 
-  background: 
-    radial-gradient(ellipse at top left, rgba(0, 212, 255, 0.08) 0%, transparent 40%),
-    radial-gradient(ellipse at bottom right, rgba(0, 255, 136, 0.06) 0%, transparent 40%),
-    radial-gradient(circle at center, rgba(255, 0, 255, 0.03) 0%, transparent 60%),
-    linear-gradient(180deg, var(--bg-primary) 0%, #050607 100%);
-}
-
-/* ── Animated grid background ─────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: 
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 212, 255, 0.03) 2px,
-      rgba(0, 212, 255, 0.03) 4px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 255, 136, 0.03) 2px,
-      rgba(0, 255, 136, 0.03) 4px
-    );
-  background-size: 100px 100px;
-  animation: backgroundShift 60s linear infinite;
-  pointer-events: none;
-  opacity: 0.3;
-}
-
-@keyframes backgroundShift {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(100px, 100px); }
-}
-
-/* ── Noise overlay ────────────────────────────────────────── */
-.noise {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.015;
-  z-index: 1;
-  mix-blend-mode: overlay;
-  background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="1"/></svg>');
+  background: linear-gradient(180deg, var(--bg-primary) 0%, #050607 100%);
 }
 
 /* ── Scrollbars ───────────────────────────────────────────── */
@@ -164,12 +109,12 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  background: var(--accent-primary-dim);
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--accent-primary-bright) 0%, var(--accent-secondary) 100%);
+  background: var(--accent-primary);
 }
 
 /* ── Selection ────────────────────────────────────────────── */
@@ -195,102 +140,19 @@ input[type="checkbox"] {
   accent-color: var(--accent-primary); 
 }
 
-/* ── Keyframe animations ──────────────────────────────────── */
+/* ── Keyframe animations (essential only) ─────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(40px) scale(0.95);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(3);
-    opacity: 0;
-  }
-}
-
-@keyframes pulseOnce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes loading {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
-@keyframes copiedPulse {
-  0% { background-color: rgba(0, 212, 255, 0.1); border-color: var(--accent-primary); }
-  100% { background-color: rgba(255, 255, 255, 0.02); border-color: var(--border-default); }
-}
-
-@keyframes endpointGlow {
-  0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.0); }
-  50% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.20), 0 0 24px rgba(0, 212, 255, 0.30); }
-  100% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.10), 0 0 20px rgba(0, 212, 255, 0.15); }
-}
-
 /* ── Animation utility classes ────────────────────────────── */
-.fade-in { animation: fadeIn 0.16s var(--ease-smooth) forwards; }
-.fade-in-up { animation: fadeInUp 0.2s var(--ease-expo) forwards; }
-.fade-in-scale { animation: fadeInScale 0.16s var(--ease-bounce) forwards; }
-.pulse-once { animation: pulseOnce 0.25s var(--ease-bounce); }
+.fade-in { animation: fadeIn 0.15s var(--ease-smooth) forwards; }
 .spinning { animation: spin 1s linear infinite; }
-.copied { animation: copiedPulse 0.25s var(--ease-bounce); }
-.loading {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 212, 255, 0) 0%,
-    rgba(0, 212, 255, 0.2) 50%,
-    rgba(0, 212, 255, 0) 100%
-  );
-  background-size: 200% 100%;
-  animation: loading 1.5s ease-in-out infinite;
-}
 
 /* ── JSON syntax highlighting ─────────────────────────────── */
 .json-key { color: var(--accent-primary); }
@@ -299,38 +161,11 @@ input[type="checkbox"] {
 .json-boolean { color: var(--accent-tertiary); }
 .json-null { color: var(--text-muted); }
 
-/* ── Compact density mode ─────────────────────────────────── */
-body.compact {
-  --space-xs: 0.125rem;
-  --space-sm: 0.25rem;
-  --space-md: 0.5rem;
-  --space-lg: 0.75rem;
-  --space-xl: 1rem;
-  --space-2xl: 1.5rem;
-  --space-3xl: 2rem;
-}
-
 /* ── Reduced motion ───────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { 
     animation: none !important; 
     transition: none !important; 
-  }
-  body::before { animation: none !important; }
-  .noise { display: none !important; }
-}
-
-/* ── Touch device optimizations ───────────────────────────── */
-@media (hover: none) {
-  .hover-lift:hover { transform: none !important; }
-}
-
-/* ── Backdrop-filter fallback ─────────────────────────────── */
-@supports not (backdrop-filter: blur(10px)) {
-  .backdrop { 
-    backdrop-filter: none; 
-    -webkit-backdrop-filter: none; 
-    background: var(--surface-primary); 
   }
 }
 
@@ -339,5 +174,238 @@ body.compact {
   .no-print { display: none; }
 }
 
-/* ── Scroll offset for sticky header ──────────────────────── */
-html { scroll-padding-top: 84px; }
+/* ═══════════════════════════════════════════════════════════
+   Shared Component Styles
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Action Bar ──────────────────────────────────────────── */
+.action-bar {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Toolbar Buttons ─────────────────────────────────────── */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  border-color: var(--border-interactive);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn--accent {
+  border-color: var(--border-interactive);
+  color: var(--accent-primary);
+}
+
+.toolbar-btn--accent:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.06);
+}
+
+.toolbar-btn--danger {
+  color: var(--accent-danger);
+  border-color: rgba(255, 51, 102, 0.35);
+}
+
+.toolbar-btn--danger:hover:not(:disabled) {
+  background: rgba(255, 51, 102, 0.08);
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+/* ── Primary Button ──────────────────────────────────────── */
+.button {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  color: var(--bg-primary);
+  border: none;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-secondary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+}
+
+/* ── Input Groups ────────────────────────────────────────── */
+.input-group {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+
+.copy-input {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.copy-input:focus {
+  outline: none;
+  border-color: var(--border-interactive);
+}
+
+/* ── Parameter Cards ─────────────────────────────────────── */
+.parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.parameter-card {
+  background: var(--surface-primary);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+
+.parameter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.parameter-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.parameter-value {
+  font-weight: 500;
+  color: var(--accent-primary);
+  font-size: 0.875rem;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 1280px) {
+  .parameter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Shared Modal Styles
+   ═══════════════════════════════════════════════════════════ */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  animation: fadeIn 0.12s var(--ease-smooth);
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  border: none;
+  cursor: pointer;
+}
+
+.modal-panel {
+  position: relative;
+  width: min(900px, 90vw);
+  max-height: 85vh;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.modal-title {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.modal-body {
+  padding: var(--space-lg);
+  overflow-y: auto;
+  flex: 1;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.modal-body--mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .modal-panel {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+}

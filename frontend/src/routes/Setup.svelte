@@ -114,7 +114,7 @@
         >?</button>
       </span>.
       {#if helpVisible}
-        <div id="openrouterApiHelp" class="help-pop show">
+        <div id="openrouterApiHelp" class="help-pop">
           Log in at
           <a href="https://openrouter.ai" target="_blank" rel="noreferrer noopener">openrouter.ai</a>,
           open <strong>Keys</strong> from your profile menu, click <strong>Create API Key</strong>, then copy it.
@@ -127,122 +127,8 @@
 </Section>
 
 <style>
-  .parameter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: var(--space-lg);
-    margin-bottom: var(--space-lg);
-  }
-
-  .parameter-card {
-    background: linear-gradient(135deg, 
-      rgba(26, 29, 33, 0.8) 0%, 
-      rgba(18, 20, 23, 0.9) 100%);
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-subtle);
-    box-shadow: var(--shadow-float);
-    transition: transform 0.3s var(--ease-smooth), box-shadow 0.3s var(--ease-smooth), border-color 0.3s var(--ease-smooth);
-  }
-
-  .parameter-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-xl);
-    border-color: var(--border-default);
-  }
-
-  .parameter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-md);
-  }
-
-  .parameter-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.9375rem;
-  }
-
-  .input-group {
-    display: flex;
-    gap: var(--space-sm);
-    align-items: stretch;
-    width: 100%;
-  }
-
-  .copy-input {
-    flex: 1;
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
-    font-size: 0.9375rem;
-    font-weight: 500;
-    outline: none;
-    transition: border-color 0.2s var(--ease-smooth), background-color 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
-    font-family: inherit;
-  }
-
   .copy-input.glow-highlight {
     border-color: var(--border-interactive);
-    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15), 0 0 24px rgba(0, 212, 255, 0.25);
-    animation: endpointGlow 1.2s var(--ease-smooth);
-  }
-
-  @keyframes endpointGlow {
-    0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.0); }
-    50% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.20), 0 0 24px rgba(0, 212, 255, 0.30); }
-    100% { box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.10), 0 0 20px rgba(0, 212, 255, 0.15); }
-  }
-
-  .metric-label {
-    font-size: 0.875rem;
-    color: var(--text-tertiary);
-    font-weight: 500;
-    margin-top: 0.5rem;
-  }
-
-  .toolbar-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.875rem;
-    line-height: 1.1;
-    cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
-  }
-
-  .toolbar-btn:hover:not(:disabled) {
-    border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text-primary);
-  }
-
-  .toolbar-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .toolbar-btn--accent {
-    border-color: var(--border-interactive);
-    color: var(--accent-primary);
-  }
-
-  .toolbar-btn--accent:hover:not(:disabled) {
-    background: rgba(0, 212, 255, 0.06);
-  }
-
-  .btn-icon {
-    width: 16px;
-    height: 16px;
   }
 
   .setup-steps {
@@ -320,14 +206,13 @@
     justify-content: center;
     font-size: 0.85em;
     cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
+    transition: border-color 0.15s, background-color 0.15s;
     z-index: 2;
   }
 
   .help-badge:hover {
     border-color: var(--border-interactive);
     background: rgba(255, 255, 255, 0.06);
-    transform: translateY(-1px) scale(1.05);
   }
 
   .help-pop {
@@ -337,19 +222,6 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     background: rgba(255, 255, 255, 0.02);
-    box-shadow: var(--shadow-sm);
-    animation: fadeInScale 0.2s var(--ease-expo);
-  }
-
-  @keyframes fadeInScale {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @media (max-width: 1280px) {
-    .parameter-grid {
-      grid-template-columns: 1fr;
-    }
+    animation: fadeIn 0.15s var(--ease-smooth);
   }
 </style>
-

@@ -71,33 +71,13 @@
     border-radius: var(--radius-md);
     background: rgba(255, 255, 255, 0.01);
     border: 1px solid var(--border-subtle);
-    transition: background-color 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth);
     cursor: pointer;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .log-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: linear-gradient(180deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-    transform: scaleY(0);
-    transition: transform 0.2s var(--ease-smooth);
+    transition: background-color 0.15s, border-color 0.15s;
   }
 
   .log-item:hover {
     background: rgba(255, 255, 255, 0.03);
     border-color: var(--border-interactive);
-    transform: translateX(8px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .log-item:hover::before {
-    transform: scaleY(1);
   }
 
   .log-item.selectable {
@@ -107,7 +87,6 @@
   .log-item.selectable.active {
     border-color: var(--accent-primary);
     background: rgba(0, 212, 255, 0.08);
-    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15), var(--shadow-sm);
   }
 
   .log-left {
@@ -136,25 +115,20 @@
     background: rgba(255, 255, 255, 0.02);
     color: var(--text-primary);
     cursor: pointer;
-    transition: border-color 0.2s var(--ease-smooth), background-color 0.2s var(--ease-smooth);
+    transition: border-color 0.15s;
   }
 
   .mini-btn:hover {
     border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.06);
   }
 
   .mini-txt-btn {
     opacity: 0;
-    pointer-events: none;
-    transform: translateX(6px);
-    transition: opacity 0.2s, transform 0.2s;
+    transition: opacity 0.15s;
   }
 
   .log-item:hover .mini-txt-btn {
     opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
   }
 
   .mini-btn.loud {
@@ -175,7 +149,7 @@
     padding: 4px 8px;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.15s, border-color 0.15s;
   }
 
   .log-item:hover .icon-btn {
@@ -186,4 +160,3 @@
     border-color: var(--border-interactive);
   }
 </style>
-

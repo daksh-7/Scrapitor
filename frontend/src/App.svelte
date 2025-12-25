@@ -10,12 +10,36 @@
   import { uiStore, logsStore, parserStore } from './lib/stores';
 
   // Refresh interval
-  let refreshInterval: number;
+  let refreshInterval: number | undefined;
+  const REFRESH_INTERVAL_MS = 5000;
+
+  function startPolling() {
+    if (refreshInterval) return;
+    refreshInterval = setInterval(() => {
+      logsStore.refresh(true);
+      uiStore.refreshEndpoints();
+    }, REFRESH_INTERVAL_MS);
+  }
+
+  function stopPolling() {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = undefined;
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      // Refresh immediately when tab becomes visible, then resume polling
+      logsStore.refresh(true);
+      uiStore.refreshEndpoints();
+      startPolling();
+    }
+  }
 
   onMount(() => {
-    // Initialize UI
-    uiStore.init();
-
     // Initial data load
     Promise.all([
       logsStore.refresh(),
@@ -23,14 +47,13 @@
       parserStore.loadSettings(),
     ]);
 
-    // Auto-refresh every 5 seconds
-    refreshInterval = setInterval(() => {
-      logsStore.refresh(true);
-      uiStore.refreshEndpoints();
-    }, 5000);
+    // Start polling and listen for visibility changes
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      clearInterval(refreshInterval);
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   });
 
@@ -43,19 +66,22 @@
   }
 </script>
 
-<div class="noise" aria-hidden="true"></div>
-
-<div class="app-shell" class:sidebar-collapsed={uiStore.sidebarCollapsed}>
+<div class="app-shell">
   <Sidebar />
   
-  <main class="main" role="main">
+  <main class="main">
     <Topbar onRefresh={handleRefresh} />
     
     <div class="container">
-      <Overview />
-      <Setup />
-      <Parser />
-      <Activity />
+      {#if uiStore.activeSection === 'overview'}
+        <Overview />
+      {:else if uiStore.activeSection === 'setup'}
+        <Setup />
+      {:else if uiStore.activeSection === 'parser'}
+        <Parser />
+      {:else if uiStore.activeSection === 'activity'}
+        <Activity />
+      {/if}
     </div>
   </main>
 </div>
@@ -81,7 +107,6 @@
   .container {
     padding: var(--space-lg);
     max-width: 100%;
-    animation: fadeInUp 0.5s var(--ease-expo);
   }
 
   @media (max-width: 768px) {

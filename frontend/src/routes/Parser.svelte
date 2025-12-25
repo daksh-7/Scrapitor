@@ -162,14 +162,12 @@
           <button class="button" onclick={addTag} aria-label="Add tag">Add</button>
         </div>
         <div class="chips">
-          {#each parserStore.sortedTags as tag, i}
-            <div style="animation-delay: {i * 30}ms" class="fade-in-scale">
-              <TagChip 
-                {tag}
-                state={parserStore.getTagState(tag)}
-                onclick={() => parserStore.cycleTagState(tag)}
-              />
-            </div>
+          {#each parserStore.sortedTags as tag}
+            <TagChip 
+              {tag}
+              state={parserStore.getTagState(tag)}
+              onclick={() => parserStore.cycleTagState(tag)}
+            />
           {/each}
         </div>
       </div>
@@ -196,8 +194,8 @@
 <!-- Tag Detect Modal -->
 {#if tagDetectModalOpen}
   <div class="modal" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" onclick={() => tagDetectModalOpen = false}></div>
-    <div class="modal-panel">
+    <button class="modal-backdrop" onclick={() => tagDetectModalOpen = false} aria-label="Close modal"></button>
+    <div class="modal-panel modal-panel--md">
       <div class="modal-header">
         <div class="modal-title">Detect Tags From Logs</div>
         <div class="modal-actions action-bar">
@@ -260,8 +258,8 @@
 <!-- Write Options Modal -->
 {#if writeModalOpen}
   <div class="modal" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" onclick={() => writeModalOpen = false}></div>
-    <div class="modal-panel" style="max-width: 400px;">
+    <button class="modal-backdrop" onclick={() => writeModalOpen = false} aria-label="Close modal"></button>
+    <div class="modal-panel modal-panel--sm">
       <div class="modal-header">
         <div class="modal-title">Write Options</div>
         <div class="modal-actions action-bar">
@@ -273,58 +271,20 @@
           </button>
         </div>
       </div>
-      <div class="modal-body" style="white-space: normal;">
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <div class="modal-body">
+        <div class="write-options">
           <button class="button" onclick={writeLatest}>Write Latest</button>
           <button class="button button-secondary" onclick={startCustomSelection}>Custom Selection…</button>
         </div>
-        <div style="margin-top: 0.75rem; color: var(--text-tertiary);">
+        <p class="write-hint">
           Choose Latest to write the most recent JSON, or Custom to select files from Activity.
-        </div>
+        </p>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .parameter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: var(--space-lg);
-    margin-bottom: var(--space-lg);
-  }
-
-  .parameter-card {
-    background: linear-gradient(135deg, 
-      rgba(26, 29, 33, 0.8) 0%, 
-      rgba(18, 20, 23, 0.9) 100%);
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-subtle);
-    box-shadow: var(--shadow-float);
-  }
-
-  .parameter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-md);
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-  }
-
-  .parameter-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.9375rem;
-  }
-
-  .parameter-value {
-    font-weight: 500;
-    color: var(--accent-primary);
-    font-size: 0.875rem;
-  }
-
   .mode-group {
     display: flex;
     gap: var(--space-sm);
@@ -339,7 +299,7 @@
     border-radius: var(--radius-full);
     background: rgba(255, 255, 255, 0.02);
     cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
     font-weight: 500;
     font-size: 0.875rem;
     color: var(--text-secondary);
@@ -359,30 +319,6 @@
     background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
     border-color: transparent;
     color: var(--bg-primary);
-    box-shadow: var(--shadow-md), 0 0 20px rgba(0, 212, 255, 0.2);
-  }
-
-  .metric-label {
-    font-size: 0.875rem;
-    color: var(--text-tertiary);
-    font-weight: 500;
-    margin-top: 0.5rem;
-  }
-
-  .input-group {
-    display: flex;
-    gap: var(--space-sm);
-    margin-top: 0.5rem;
-  }
-
-  .copy-input {
-    flex: 1;
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
-    font-size: 0.9375rem;
   }
 
   .chips {
@@ -392,115 +328,13 @@
     margin-top: 0.75rem;
   }
 
-  .action-bar {
-    display: flex;
-    gap: var(--space-sm);
-    align-items: center;
-    flex-wrap: wrap;
-    margin-top: 1rem;
+  /* Modal size variants (uses shared modal styles from app.css) */
+  .modal-panel--sm {
+    width: min(400px, 90vw);
   }
 
-  .toolbar-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
-  }
-
-  .toolbar-btn:hover {
-    border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text-primary);
-  }
-
-  .toolbar-btn--accent {
-    border-color: var(--border-interactive);
-    color: var(--accent-primary);
-  }
-
-  .toolbar-btn--danger {
-    color: var(--accent-danger);
-    border-color: rgba(255, 51, 102, 0.35);
-  }
-
-  .btn-icon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .button {
-    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-    color: var(--bg-primary);
-    border: none;
-    padding: var(--space-sm) var(--space-lg);
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .button-secondary {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-default);
-    color: var(--text-primary);
-  }
-
-  /* Modal styles */
-  .modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-lg);
-    animation: fadeIn 0.12s var(--ease-smooth);
-  }
-
-  .modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(4px);
-  }
-
-  .modal-panel {
-    position: relative;
+  .modal-panel--md {
     width: min(600px, 90vw);
-    max-height: 85vh;
-    background: linear-gradient(135deg, rgba(26, 29, 33, 0.95) 0%, rgba(18, 20, 23, 0.98) 100%);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
-    display: flex;
-    flex-direction: column;
-    animation: slideUp 0.15s var(--ease-expo);
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .modal-title {
-    font-weight: 700;
-    font-size: 1.125rem;
-    color: var(--text-primary);
-  }
-
-  .modal-body {
-    padding: var(--space-lg);
-    overflow-y: auto;
   }
 
   .detect-list {
@@ -521,14 +355,14 @@
     border-bottom: 0;
   }
 
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  .write-options {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
-  @keyframes slideUp {
-    from { transform: translateY(40px) scale(0.95); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
+  .write-hint {
+    margin-top: 0.75rem;
+    color: var(--text-tertiary);
   }
 </style>
-

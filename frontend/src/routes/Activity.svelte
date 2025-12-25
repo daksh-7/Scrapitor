@@ -17,9 +17,12 @@
   let confirmMessage = $state('');
   let confirmAction = $state<() => void>(() => {});
 
+  // Memoize the lowercase search term (no debounce needed with derived)
+  const filterLower = $derived(filterText.toLowerCase());
+
   const filteredLogs = $derived(
     filterText
-      ? logsStore.logs.filter(name => name.toLowerCase().includes(filterText.toLowerCase()))
+      ? logsStore.logs.filter(name => name.toLowerCase().includes(filterLower))
       : logsStore.logs
   );
 
@@ -186,16 +189,14 @@
         <p>Waiting for requests...</p>
       </div>
     {:else}
-      {#each visibleLogs as name, i (name)}
-        <div style="animation-delay: {i * 20}ms" class="fade-in-up">
-          <LogItem 
-            {name}
-            selectable={logsStore.selectingLogs}
-            selected={logsStore.selectedLogs.has(name)}
-            onclick={() => logsStore.selectingLogs ? logsStore.toggleSelection(name) : openLog(name)}
-            onOpenParsed={() => openParsedList(name)}
-          />
-        </div>
+      {#each visibleLogs as name (name)}
+        <LogItem 
+          {name}
+          selectable={logsStore.selectingLogs}
+          selected={logsStore.selectedLogs.has(name)}
+          onclick={() => logsStore.selectingLogs ? logsStore.toggleSelection(name) : openLog(name)}
+          onOpenParsed={() => openParsedList(name)}
+        />
       {/each}
     {/if}
   </div>
@@ -214,40 +215,30 @@
 </Modal>
 
 <!-- Parsed Versions Modal -->
-{#if parsedModalOpen}
-  <div class="modal" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" onclick={() => parsedModalOpen = false}></div>
-    <div class="modal-panel">
-      <div class="modal-header">
-        <div class="modal-title">{parsedModalTitle}</div>
-        <div class="modal-actions action-bar">
-          <button class="toolbar-btn" onclick={() => parsedModalOpen = false}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">Close</span>
-          </button>
-        </div>
-      </div>
-      <div class="modal-body version-picker">
-        <div class="version-header">Parsed TXT Versions</div>
-        <ul class="version-list">
-          {#each parsedVersions as version}
-            <li>
-              <button 
-                class="version-item" 
-                onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
-              >
-                {version.file}
-              </button>
-              <span class="meta">{formatDate(version.mtime)} • {formatSize(version.size)}</span>
-            </li>
-          {/each}
-        </ul>
-      </div>
+<Modal
+  open={parsedModalOpen}
+  title={parsedModalTitle}
+  onClose={() => parsedModalOpen = false}
+>
+  {#snippet children()}
+    <div class="version-picker">
+      <div class="version-header">Parsed TXT Versions</div>
+      <ul class="version-list">
+        {#each parsedVersions as version}
+          <li>
+            <button 
+              class="version-item" 
+              onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
+            >
+              {version.file}
+            </button>
+            <span class="meta">{formatDate(version.mtime)} • {formatSize(version.size)}</span>
+          </li>
+        {/each}
+      </ul>
     </div>
-  </div>
-{/if}
+  {/snippet}
+</Modal>
 
 <!-- Confirm Modal -->
 <ConfirmModal 
@@ -262,88 +253,13 @@
 />
 
 <style>
-  .input-group {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .copy-input {
-    flex: 1;
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
-    font-size: 0.9375rem;
-  }
-
-  .button {
-    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-    color: var(--bg-primary);
-    border: none;
-    padding: var(--space-sm) var(--space-lg);
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .button-secondary {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-default);
-    color: var(--text-primary);
-  }
-
-  .action-bar {
-    display: flex;
-    gap: var(--space-sm);
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .toolbar-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.4rem 0.75rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
-  }
-
-  .toolbar-btn:hover {
-    border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text-primary);
-  }
-
-  .toolbar-btn--accent {
-    border-color: var(--border-interactive);
-    color: var(--accent-primary);
-  }
-
-  .toolbar-btn--danger {
-    color: var(--accent-danger);
-    border-color: rgba(255, 51, 102, 0.35);
-  }
-
-  .btn-icon {
-    width: 16px;
-    height: 16px;
-  }
-
   .logs-container {
-    background: linear-gradient(135deg, rgba(22, 24, 28, 0.8) 0%, rgba(16, 18, 21, 0.9) 100%);
+    background: var(--surface-secondary);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: var(--space-md);
     height: min(60vh, 600px);
     overflow-y: auto;
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2), var(--shadow-float);
   }
 
   .empty-state {
@@ -361,71 +277,9 @@
     height: 64px;
     margin-bottom: var(--space-lg);
     opacity: 0.3;
-    animation: float 3s ease-in-out infinite;
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
-
-  /* Modal styles */
-  .modal {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-lg);
-    animation: fadeIn 0.12s var(--ease-smooth);
-  }
-
-  .modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(4px);
-  }
-
-  .modal-panel {
-    position: relative;
-    width: min(700px, 90vw);
-    max-height: 85vh;
-    background: linear-gradient(135deg, rgba(26, 29, 33, 0.95) 0%, rgba(18, 20, 23, 0.98) 100%);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
-    display: flex;
-    flex-direction: column;
-    animation: slideUp 0.15s var(--ease-expo);
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .modal-title {
-    font-weight: 700;
-    font-size: 1.125rem;
-    color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: var(--space-sm);
-  }
-
-  .modal-body {
-    padding: var(--space-lg);
-    overflow-y: auto;
-  }
-
+  /* Version picker styles (used inside Modal) */
   .version-picker {
     white-space: normal;
     word-break: normal;
@@ -458,7 +312,7 @@
     background: rgba(255, 255, 255, 0.02);
     color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.2s var(--ease-smooth);
+    transition: border-color 0.15s;
   }
 
   .version-item:hover {
@@ -469,15 +323,4 @@
     color: var(--text-tertiary);
     font-size: 0.75rem;
   }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(40px) scale(0.95); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
-  }
 </style>
-

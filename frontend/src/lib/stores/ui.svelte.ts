@@ -1,12 +1,6 @@
 import { getTunnel, getHealth } from '$lib/api';
 
 class UIStore {
-  // Sidebar
-  sidebarCollapsed = $state(false);
-  
-  // Density
-  compactMode = $state(false);
-  
   // Endpoints
   cloudflareUrl = $state('');
   localUrl = $state('http://localhost:5000/openrouter-cc');
@@ -21,37 +15,6 @@ class UIStore {
   
   // Loading state
   loading = $state(false);
-
-  // Initialization
-  init() {
-    // Load preferences from localStorage
-    if (typeof window !== 'undefined') {
-      this.sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
-      this.compactMode = localStorage.getItem('densityCompact') === '1';
-      
-      if (this.compactMode) {
-        document.body.classList.add('compact');
-      }
-    }
-  }
-
-  // Sidebar
-  toggleSidebar() {
-    this.sidebarCollapsed = !this.sidebarCollapsed;
-    localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
-  }
-
-  // Density
-  toggleDensity() {
-    this.compactMode = !this.compactMode;
-    localStorage.setItem('densityCompact', this.compactMode ? '1' : '0');
-    
-    if (this.compactMode) {
-      document.body.classList.add('compact');
-    } else {
-      document.body.classList.remove('compact');
-    }
-  }
 
   // Navigation
   setActiveSection(section: string) {
@@ -108,4 +71,3 @@ class UIStore {
 }
 
 export const uiStore = new UIStore();
-

@@ -21,6 +21,9 @@ class LogsStore {
   private jsonCache = new Map<string, string>();
   private parsedListCache = new Map<string, ParsedListResponse>();
   private parsedContentCache = new Map<string, string>();
+  
+  // O(1) metadata lookup index
+  private itemsByName = new Map<string, LogItem>();
 
   // Computed
   get visibleLogs() {
@@ -43,6 +46,12 @@ class LogsStore {
       this.total = data.total;
       this.totalAll = data.total_all;
       this.parsedTotal = data.parsed_total;
+      
+      // Rebuild O(1) lookup index
+      this.itemsByName.clear();
+      for (const item of data.items) {
+        this.itemsByName.set(item.name, item);
+      }
       
       // Prefetch first few logs in background
       this.prefetchLogs(this.logs.slice(0, 5));
@@ -202,9 +211,9 @@ class LogsStore {
     this.parsedContentCache.clear();
   }
 
-  // Get metadata for a log
+  // Get metadata for a log (O(1) lookup)
   getMeta(name: string): LogItem | undefined {
-    return this.items.find(item => item.name === name);
+    return this.itemsByName.get(name);
   }
 }
 
