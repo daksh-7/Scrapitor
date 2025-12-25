@@ -170,7 +170,7 @@ Use these six steps inside JanitorAI’s UI (exactly as shown in the app):
 
 - Initiate a chat with the desired character on JanitorAI.
 - Click "using proxy"; under "proxy", add a configuration and name it anything.
-- For model name, paste: `mistralai/mistral-small-3.2-24b-instruct:free`
+- For model name, paste: `mistralai/devstral-2512:free`
 - Paste the Cloudflare URL (copied above) under "Proxy URL."
 - Enter your OpenRouter API key in the "API Key" section. If you don't have an OpenRouter API Key, follow these steps:
   - Log in to [openrouter.ai](https://openrouter.ai).
@@ -295,7 +295,7 @@ curl -sS \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <OPENROUTER_API_KEY>' \
   -d '{
-        "model": "mistralai/mistral-small-3.2-24b-instruct:free",
+        "model": "mistralai/devstral-2512:free",
         "messages": [ {"role": "user", "content": "hi"} ],
         "stream": false
       }' \
@@ -309,7 +309,7 @@ curl -sS -N \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <OPENROUTER_API_KEY>' \
   -d '{
-        "model": "mistralai/mistral-small-3.2-24b-instruct:free",
+        "model": "mistralai/devstral-2512:free",
         "messages": [ {"role": "user", "content": "hi"} ],
         "stream": true
       }' \
