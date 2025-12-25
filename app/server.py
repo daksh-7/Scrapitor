@@ -15,10 +15,12 @@ from typing import Any, Dict, Optional
 import requests
 from flask import Flask, Response, jsonify, request, stream_with_context, render_template, send_from_directory
 from flask_cors import CORS
+
+# Import tag utilities from parser (handles both module and direct execution)
 try:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-except Exception:
-    ProxyFix = None  # type: ignore
+    from app.parser.parser import _compile_tag_pair, _remove_tag_blocks
+except ImportError:
+    from parser.parser import _compile_tag_pair, _remove_tag_blocks
 
 
 # ── config ───────────────────────────────────────────────────
@@ -41,7 +43,6 @@ def _load_config() -> Dict[str, Any]:
         "server": {
             "port": env("PROXY_PORT", 5000, int),
             "allowed_origins": allowed_list,
-            "rate_limit": env("RATE_LIMIT", "60 per minute"),
             "connect_timeout": env("CONNECT_TIMEOUT", 5.0, float),
             "read_timeout": env("READ_TIMEOUT", 300.0, float),
         },
@@ -87,7 +88,6 @@ log = logging.getLogger("proxy")
 OPENROUTER_URL = CONFIG["openrouter"]["url"]
 LISTEN_PORT = CONFIG["server"]["port"]
 TIMEOUT = (CONFIG["server"]["connect_timeout"], CONFIG["server"]["read_timeout"])
-BASE_DIR = pathlib.Path(__file__).parents[1]
 BASE_DIR = pathlib.Path(__file__).parent
 LOG_DIR = (BASE_DIR / CONFIG["logging"].get("directory", "var/logs")).resolve(); LOG_DIR.mkdir(parents=True, exist_ok=True)
 PARSED_ROOT = (LOG_DIR / "parsed").resolve(); PARSED_ROOT.mkdir(parents=True, exist_ok=True)
@@ -259,7 +259,6 @@ def _build_parser_args(json_path: pathlib.Path, override: Optional[Dict] = None)
     mode = str(settings.get("mode", "default")).lower()
     include_tags = [str(x).strip() for x in settings.get("include_tags", []) if str(x).strip()]
     exclude_tags = [str(x).strip() for x in settings.get("exclude_tags", []) if str(x).strip()]
-    persona_name = ""
     if mode == "custom":
         # Always run in custom preset; choose include or omit flags accordingly
         args += ["--preset", "custom"]
@@ -362,8 +361,6 @@ def create_app() -> Flask:
         expose_headers=["Content-Type"],
         supports_credentials=False,
     )
-
-    # No rate limiting
 
     @app.route("/openrouter-cc", methods=["GET", "POST", "OPTIONS"])
     def openrouter_cc():
@@ -800,42 +797,6 @@ def create_app() -> Flask:
         - files: comma-separated list
         If none provided, falls back to latest.
         """
-        def _compile_tag_pair(name: str):
-            open_re = re.compile(rf"<\s*{re.escape(name)}\b[^>]*>", re.IGNORECASE)
-            close_re = re.compile(rf"</\s*{re.escape(name)}\s*>", re.IGNORECASE)
-            return open_re, close_re
-
-        def _remove_tag_blocks(text: str, name: str) -> str:
-            """Remove every <name>...</name> block, handling nesting. If not properly
-            closed, removes through end. Matches case-insensitively.
-            """
-            open_re, close_re = _compile_tag_pair(name)
-            pos = 0
-            while True:
-                m_open = open_re.search(text, pos)
-                if not m_open:
-                    break
-                start = m_open.start()
-                scan = m_open.end()
-                depth = 1
-                end_idx = len(text)
-                while depth > 0:
-                    m_next_open = open_re.search(text, scan)
-                    m_next_close = close_re.search(text, scan)
-                    if not m_next_close:
-                        end_idx = len(text)
-                        break
-                    if m_next_open and m_next_open.start() < m_next_close.start():
-                        depth += 1
-                        scan = m_next_open.end()
-                        continue
-                    depth -= 1
-                    scan = m_next_close.end()
-                    end_idx = scan
-                text = text[:start] + text[end_idx:]
-                pos = start
-            return text
-
         names_in = set()
         for n in request.args.getlist("file"):
             n = (n or "").strip()

@@ -7,7 +7,6 @@ import pathlib
 import re
 import sys
 from typing import Optional, Tuple
-import pathlib as _pathlib  # alias to avoid confusion
 
 
 _APP_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -391,7 +390,7 @@ def process_json(
     # Determine output destination
     dest_dir = output_dir if output_dir else path.parent
     try:
-        _pathlib.Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(dest_dir).mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
 
