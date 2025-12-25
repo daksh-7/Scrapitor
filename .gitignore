@@ -18,7 +18,6 @@ coverage.xml
 
 # Build artifacts
 build/
-dist/
 *.egg-info/
 
 # Logs and runtime state
@@ -37,8 +36,15 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Node (in case front-end tooling is added later)
+# Node / Frontend
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
+# Note: package-lock.json is NOT ignored - needed for reproducible Docker builds
+
+# Svelte/Vite build output (generated from frontend/)
+app/static/dist/
+frontend/dist/
+
+# Vite cache
+.vite/

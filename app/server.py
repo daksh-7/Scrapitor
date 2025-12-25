@@ -922,14 +922,40 @@ def create_app() -> Flask:
 
 app = create_app()
 
+# Check if SPA build exists
+_SPA_DIST = BASE_DIR / "static" / "dist"
+_SPA_EXISTS = _SPA_DIST.exists() and (_SPA_DIST / "index.html").exists()
+_USE_SPA = True  # FORCE SPA - set to _SPA_EXISTS to enable auto-detection
+
+if _USE_SPA and not _SPA_EXISTS:
+    log.warning(f"SPA forced but dist not found at {_SPA_DIST}")
+else:
+    log.info(f"Using {'Svelte SPA' if _USE_SPA else 'Legacy Jinja templates'}")
+
 @app.route("/")
 def ui():
+    if _USE_SPA:
+        # Serve the Svelte SPA
+        return send_from_directory(_SPA_DIST, "index.html"), 200, {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+    # Fallback to Jinja templates (legacy)
     html = render_template(
         "index.html",
         port=LISTEN_PORT,
         max_messages=CONFIG["security"]["max_messages"],
     )
     return html, 200, {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+
+# Serve SPA assets
+@app.route("/assets/<path:filename>")
+def spa_assets(filename: str):
+    if _USE_SPA:
+        resp = send_from_directory(_SPA_DIST / "assets", filename)
+        # Cache built assets for 1 year (they have hashed filenames)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+    return "", 404
 
 
 @app.errorhandler(500)

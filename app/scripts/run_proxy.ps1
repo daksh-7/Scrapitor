@@ -412,6 +412,70 @@ if (-not (Test-Path (Join-Path $AppRoot "server.py"))) {
     exit 1
 }
 
+# Build frontend if needed (Svelte SPA)
+$FrontendDir = Join-Path $RepoRoot "frontend"
+$SpaDistDir = Join-Path $AppRoot "static\dist"
+$SpaIndexHtml = Join-Path $SpaDistDir "index.html"
+
+if (Test-Path $FrontendDir) {
+    $needsBuild = $false
+    
+    # Check if dist doesn't exist
+    if (-not (Test-Path $SpaIndexHtml)) {
+        $needsBuild = $true
+        Write-ColorOutput "Frontend build not found, will build..." -Color Cyan
+    } else {
+        # Check if source is newer than build
+        $srcDir = Join-Path $FrontendDir "src"
+        if (Test-Path $srcDir) {
+            $newestSrc = Get-ChildItem -Path $srcDir -Recurse -File | 
+                Sort-Object LastWriteTime -Descending | 
+                Select-Object -First 1
+            $distTime = (Get-Item $SpaIndexHtml).LastWriteTime
+            if ($newestSrc -and $newestSrc.LastWriteTime -gt $distTime) {
+                $needsBuild = $true
+                Write-ColorOutput "Frontend source changed, will rebuild..." -Color Cyan
+            }
+        }
+    }
+    
+    if ($needsBuild) {
+        # Check if npm is available
+        $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+        if ($npmCmd) {
+            Push-Location $FrontendDir
+            try {
+                # Install dependencies if needed
+                $nodeModules = Join-Path $FrontendDir "node_modules"
+                if (-not (Test-Path $nodeModules)) {
+                    Write-ColorOutput "Installing frontend dependencies..." -Color Cyan
+                    npm install --silent 2>$null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-ColorOutput "WARNING: npm install failed, continuing without frontend build" -Color Yellow
+                    }
+                }
+                
+                # Build
+                if (Test-Path $nodeModules) {
+                    Write-ColorOutput "Building frontend (Svelte SPA)..." -Color Cyan
+                    npm run build 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-ColorOutput "Frontend build complete" -Color Green
+                    } else {
+                        Write-ColorOutput "WARNING: Frontend build failed, will use legacy templates" -Color Yellow
+                    }
+                }
+            } finally {
+                Pop-Location
+            }
+        } else {
+            Write-ColorOutput "Node.js not found, skipping frontend build (using legacy templates)" -Color Yellow
+        }
+    } else {
+        Write-ColorOutput "Frontend is up to date" -Color Green
+    }
+}
+
 # Stop previous instances of THIS app (not all Python processes!)
 try {
     $stoppedAny = $false

@@ -12,8 +12,20 @@ app/var/
 
 # Git
 .git/
+.gitignore
 
 # OS/editor noise
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
 
+# Node - exclude local node_modules (installed fresh in Docker)
+frontend/node_modules/
+
+# Local builds (built fresh in Docker)
+app/static/dist/
+
+# Documentation (not needed in image)
+docs/
+*.md
