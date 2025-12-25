@@ -373,48 +373,22 @@ Notes:
 
 ## Configuration
 
-You can configure via environment variables or an optional `config.yaml` in `Scrapitor/app/`.
+Configuration is done via environment variables. Set them in your shell, a `.env` file at the repo root (for Docker Compose), or via your deployment platform.
 
-Environment variables (selected):
+Environment variables:
 
-- `PROXY_PORT`: Port for the Flask server (default 5000).
-- `OPENROUTER_URL`: Upstream URL (default `https://openrouter.ai/api/v1/chat/completions`).
-- `OPENROUTER_API_KEY`: Optional server-side key; if unset, client `Authorization` is forwarded.
-- `ALLOWED_ORIGINS`: CSV of CORS origins (defaults to `*`).
-- `LOG_DIR`: Log directory (default `var/logs`).
-- `MAX_LOG_FILES`: Max number of JSON logs to keep (default 1000).
-- `LOG_LEVEL`: Python logging level (default `INFO`).
-- `CONNECT_TIMEOUT`, `READ_TIMEOUT`: Upstream timeouts.
-
-Example `config.yaml`:
-
-```yaml
-server:
-  port: 5000
-  allowed_origins: ["*"]
-  connect_timeout: 5.0
-  read_timeout: 300.0
-openrouter:
-  url: https://openrouter.ai/api/v1/chat/completions
-  api_key: ""   # optional; otherwise forward client Authorization
-  defaults:
-    temperature: 1.0
-    top_p: 1.0
-    top_k: 0
-    max_tokens: 1024
-logging:
-  directory: var/logs
-  max_files: 1000
-  level: INFO
-parser:
-  mode: default          # default | custom
-  include_tags: []
-  exclude_tags: []
-security:
-  max_messages: 50
-  max_model_length: 100
-  validate_requests: true
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PROXY_PORT` | `5000` | Port for the Flask server |
+| `OPENROUTER_URL` | `https://openrouter.ai/api/v1/chat/completions` | Upstream API URL |
+| `OPENROUTER_API_KEY` | *(empty)* | Optional server-side key; if unset, client `Authorization` is forwarded |
+| `ALLOW_SERVER_API_KEY` | `false` | Set `true` to allow using `OPENROUTER_API_KEY` server-side |
+| `ALLOWED_ORIGINS` | `*` | CSV of CORS origins |
+| `LOG_DIR` | `var/logs` | Log directory |
+| `MAX_LOG_FILES` | `1000` | Max number of JSON logs to keep |
+| `LOG_LEVEL` | `INFO` | Python logging level |
+| `CONNECT_TIMEOUT` | `5.0` | Upstream connection timeout (seconds) |
+| `READ_TIMEOUT` | `300.0` | Upstream read timeout (seconds) |
 
 
 ## Troubleshooting

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import hashlib
 import logging
 import os
 import pathlib
@@ -14,11 +13,7 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
-try:
-    import yaml  # optional; config.yaml support
-except Exception:
-    yaml = None  # type: ignore
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template_string, render_template, send_from_directory
+from flask import Flask, Response, jsonify, request, stream_with_context, render_template, send_from_directory
 from flask_cors import CORS
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -28,28 +23,6 @@ except Exception:
 
 # ── config ───────────────────────────────────────────────────
 def _load_config() -> Dict[str, Any]:
-    # Prefer config next to this file (Scrapitor/app/config.yaml) for consistent
-    # behavior regardless of the current working directory. Fall back to a
-    # CWD-level config.yaml for backward compatibility.
-    candidates = [
-        pathlib.Path(__file__).with_name("config.yaml"),
-        pathlib.Path("config.yaml"),
-    ]
-    cfg_path = next((p for p in candidates if p.exists()), None)
-    file_cfg: Dict[str, Any] = {}
-    if cfg_path is not None and yaml is not None:
-        try:
-            file_cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
-        except Exception as e:
-            print(f"Warning: failed to load {cfg_path}: {e}")
-
-    def get(path, default):
-        cur = file_cfg
-        for k in path.split("."):
-            cur = (cur or {}).get(k, {})
-        return default if cur == {} else cur
-
-    # env helpers
     def env(k, default, cast=str):
         v = os.getenv(k)
         if v is None:
@@ -59,39 +32,32 @@ def _load_config() -> Dict[str, Any]:
         except Exception:
             return default
 
-    raw_allowed = os.getenv("ALLOWED_ORIGINS", "") or ",".join(get("server.allowed_origins", ["*"]))
+    raw_allowed = os.getenv("ALLOWED_ORIGINS", "*")
     allowed_list = [origin.strip() for origin in raw_allowed.split(",") if origin.strip()]
     if not allowed_list:
         allowed_list = ["*"]
 
     return {
         "server": {
-            "port": env("PROXY_PORT", get("server.port", 5000), int),
+            "port": env("PROXY_PORT", 5000, int),
             "allowed_origins": allowed_list,
-            "rate_limit": env("RATE_LIMIT", get("server.rate_limit", "60 per minute")),
-            "connect_timeout": env("CONNECT_TIMEOUT", get("server.connect_timeout", 5.0), float),
-            "read_timeout": env("READ_TIMEOUT", get("server.read_timeout", 300.0), float),
+            "rate_limit": env("RATE_LIMIT", "60 per minute"),
+            "connect_timeout": env("CONNECT_TIMEOUT", 5.0, float),
+            "read_timeout": env("READ_TIMEOUT", 300.0, float),
         },
         "openrouter": {
-            "url": os.getenv("OPENROUTER_URL", get("openrouter.url", "https://openrouter.ai/api/v1/chat/completions")),
-            "api_key": os.getenv("OPENROUTER_API_KEY", get("openrouter.api_key", "")),
-            # Only use server-side API key when explicitly enabled for safety
-            "allow_server_api_key": str(os.getenv("ALLOW_SERVER_API_KEY", str(get("openrouter.allow_server_api_key", False)))).lower() in ("1", "true", "yes", "on"),
-            "defaults": get("openrouter.defaults", {
-                "temperature": 1.0, "top_p": 1.0, "top_k": 0, "max_tokens": 1024
-            }),
+            "url": os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions"),
+            "api_key": os.getenv("OPENROUTER_API_KEY", ""),
+            "allow_server_api_key": str(os.getenv("ALLOW_SERVER_API_KEY", "false")).lower() in ("1", "true", "yes", "on"),
+            "defaults": {"temperature": 1.0, "top_p": 1.0, "top_k": 0, "max_tokens": 1024},
         },
         "logging": {
-            "directory": os.getenv("LOG_DIR", get("logging.directory", "var/logs")),
-            "max_files": env("MAX_LOG_FILES", get("logging.max_files", 1000), int),
-            "level": os.getenv("LOG_LEVEL", get("logging.level", "INFO")),
+            "directory": os.getenv("LOG_DIR", "var/logs"),
+            "max_files": env("MAX_LOG_FILES", 1000, int),
+            "level": os.getenv("LOG_LEVEL", "INFO"),
         },
-        "parser": get("parser", {
-            "mode": "default",   # default | custom
-            "include_tags": [],
-            "exclude_tags": [],
-        }),
-        "security": get("security", {"max_messages": 50, "max_model_length": 100, "validate_requests": True}),
+        "parser": {"mode": "default", "include_tags": [], "exclude_tags": []},
+        "security": {"max_messages": 50, "max_model_length": 100, "validate_requests": True},
     }
 
 CONFIG = _load_config()
