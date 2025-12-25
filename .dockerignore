@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtualenvs
+.venv/
+app/.venv/
+
+# Runtime logs/state (mounted at runtime in Docker)
+app/var/
+*.log
+
+# Git
+.git/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+

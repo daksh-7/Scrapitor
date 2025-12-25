@@ -1,14 +1,15 @@
 # scrapitor
 
-Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. A one-click Windows launcher provisions a Cloudflare tunnel for easy external access.
+Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. Run it via **Docker Compose (recommended)** or via the Windows launcher (`run.bat`).
 
-If you prefer the shortest path, jump to [Casual Usage](#casual-usage).
+If you prefer the shortest path, jump to [Docker (Installation and Usage)](#docker-installation-and-usage) or [Casual Usage](#casual-usage).
 
 ## Table of Contents
 
 - [Features](#features)
 - [Directory Structure](#directory-structure)
 - [Installation](#installation)
+- [Docker (Installation and Usage)](#docker-installation-and-usage)
 - [Casual Usage](#casual-usage)
 - [Usage in Janitor](#usage-in-janitor)
 - [How It Works](#how-it-works)
@@ -26,7 +27,7 @@ If you prefer the shortest path, jump to [Casual Usage](#casual-usage).
 ## Features
 
 - Proxy Gateway: Drop-in `/chat/completions`-style endpoint at `/openrouter-cc` forwarding to OpenRouter with streaming support.
-- One-Click Tunnel: PowerShell script auto-installs dependencies and brings up a Cloudflare tunnel; exposes a public URL.
+- One-Click Tunnel (Docker or Windows): Brings up a Cloudflare quick tunnel (`cloudflared`) and exposes a public URL; the dashboard reads it from `app/var/state/tunnel_url.txt` (also available at `GET /tunnel`).
 - Request Capture: Captures (scrapes) JanitorAI request payloads into portable JSON logs for repeatable processing and auditing.
 - Sophisticated Parsing: Rule-driven, tag-aware extraction with include/omit and strip options; ideal for producing clean character sheets.
 - Full Customization: Include-only (whitelist) or omit (blacklist) modes, tag detection from logs, add-your-own tags, and chip-based toggling.
@@ -57,8 +58,12 @@ If you prefer the shortest path, jump to [Casual Usage](#casual-usage).
     │   ├── requirements.txt
     │   └── server.py
     ├── docker
-    │   └── Dockerfile
+    │   ├── Dockerfile
+    │   └── tunnel
+    │       ├── Dockerfile
+    │       └── entrypoint.sh
     ├── docker-compose.yml
+    ├── .dockerignore
     ├── .gitignore
     └── run.bat
 ```
@@ -81,9 +86,14 @@ winget install git.git
 git clone https://github.com/daksh-7/Scrapitor
 ```
 
-2) Prerequisites on Windows:
+2) Choose a run method:
 
-- PowerShell 7 (`pwsh`). If you don't have it, install with:
+- **Docker (recommended)**: see [Docker (Installation and Usage)](#docker-installation-and-usage). Requires Docker Desktop only.
+- **Windows launcher (no Docker)**: requires PowerShell 7 + Python.
+
+Windows prerequisites:
+
+- PowerShell 7 (`pwsh`). Install with:
 
 ```powershell
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
@@ -100,7 +110,7 @@ The launcher will:
 - Create a local virtual environment `Scrapitor/app/.venv` and install `requirements.txt`.
 - Start the Flask server on the configured port (default 5000) and verify health.
 - Install or download `cloudflared` if needed, start a tunnel, and print the public URL.
-- Open both the dashboard (local and Cloudflare) in your browser.
+- Print both the dashboard URLs (local and Cloudflare) in the console.
 
 Copy the “JanitorAI API URL” shown in the console or the UI (it ends with `/openrouter-cc`). You will use it in JanitorAI’s proxy settings.
 
@@ -119,22 +129,39 @@ Run with Docker Compose:
 docker compose up --build
 ```
 
-What happens:
+This starts **two containers**:
 
-- Builds the image using `docker/Dockerfile`.
-- Starts the Flask server inside the container and launches a Cloudflare tunnel using `cloudflared`.
-- Persists runtime data under `app/var/` on your host so the dashboard can read `tunnel_url.txt` and data is kept across restarts.
-- Provides a TryCloudflare URL; it is also saved to `app/var/state/tunnel_url.txt`.
+- **`proxy`**: runs the Flask server (`python -m app.server`).
+- **`tunnel`**: runs `cloudflared tunnel --url http://proxy:$PROXY_PORT`, detects the first `*.trycloudflare.com` URL from logs, and writes it to `app/var/state/tunnel_url.txt` (so the UI can display it via `GET /tunnel`).
+
+Proxy only (no public tunnel):
+
+```
+docker compose up --build proxy
+```
 
 Manual Docker compose commands:
 
 ```
-docker compose up --build
 docker compose down
 docker compose up
 ```
 
 After launch, copy the Cloudflare endpoint shown and proceed to [Usage in Janitor](#usage-in-janitor).
+
+Useful commands:
+
+```
+docker compose logs -f tunnel
+docker compose logs -f proxy
+```
+
+Environment variables (use a `.env` file at the repo root, or set them in your shell):
+
+- `PROXY_PORT`: Flask port (default `5000`)
+- `OPENROUTER_API_KEY`: optional server-side key (otherwise the client `Authorization` header is forwarded)
+- `ALLOW_SERVER_API_KEY`: set `true` to allow using `OPENROUTER_API_KEY` server-side (default `false`)
+- `CLOUDFLARED_FLAGS`: extra cloudflared flags (default is `--edge-ip-version 4 --loglevel info`)
 
 
 ### Directory Structure additions for Docker
@@ -144,20 +171,23 @@ After launch, copy the Cloudflare endpoint shown and proceed to [Usage in Janito
 └── Scrapitor
     ├── app
     ├── docker
-    │   └── Dockerfile
+    │   ├── Dockerfile
+    │   └── tunnel
+    │       ├── Dockerfile
+    │       └── entrypoint.sh
     ├── docker-compose.yml
+    ├── .dockerignore
     └── run.bat
 ```
 
 
 ## Casual Usage
 
-If you just want to use scrapitor with JanitorAI quickly, start with one of these two options:
+1) Start scrapitor:
 
-- Option A (no Git needed): Download ZIP from `https://github.com/daksh-7/Scrapitor`, unzip, then run `Scrapitor\run.bat`.
-- Option B (with Git): If you don’t have Git, install it: `winget install git.git`. Then `git clone https://github.com/daksh-7/Scrapitor` and run `Scrapitor\run.bat`.
+- Option A (recommended): `docker compose up --build` then open `http://localhost:5000/` (or `http://localhost:<PROXY_PORT>/` if you changed `PROXY_PORT`).
+- Option B (Windows launcher): Download ZIP from `https://github.com/daksh-7/Scrapitor`, unzip, then run `Scrapitor\run.bat`.
 
-After launch, wait until “SUCCESS! Proxy is running”.
 2) In the dashboard “Setup” section, copy the “Cloudflare Endpoint” and the “Model Name Preset”.
 3) Follow the steps in [Usage in Janitor](#usage-in-janitor) to wire JanitorAI to your Cloudflare endpoint.
 4) Send a message in JanitorAI; your request appears in “Activity”.
@@ -202,11 +232,11 @@ Prerequisites
 Setup
 
 ```
-cd Scrapitor/app
-python -m venv .venv
-.venv\Scripts\pip install --upgrade pip
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m app.server
+cd Scrapitor
+python -m venv app\.venv
+app\.venv\Scripts\pip install --upgrade pip
+app\.venv\Scripts\pip install -r app\requirements.txt
+app\.venv\Scripts\python -m app.server
 ```
 
 Cloudflare tunnel (in another terminal):
@@ -218,9 +248,9 @@ cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 On macOS/Linux, adjust venv paths accordingly, for example:
 
 ```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv app/.venv
+source app/.venv/bin/activate
+pip install -r app/requirements.txt
 python -m app.server
 cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 ```
@@ -389,7 +419,9 @@ security:
 
 ## Troubleshooting
 
-- No Cloudflare URL appears: Ensure `cloudflared` is installed and not blocked by firewall. The launcher can install it via `winget` or download the latest release.
+- No Cloudflare URL appears:
+  - Docker: check `docker compose logs -f tunnel` and ensure your network/firewall allows outbound connections.
+  - Windows launcher: ensure `cloudflared` is installed and not blocked by firewall. The launcher can install it via `winget` or download the latest release.
 - Script exits with "PowerShell 7 is required": Install PowerShell 7 with the winget command above, then re-run `run.bat`.
 - Port already in use: Set `PROXY_PORT` to a free port, or stop the conflicting process.
 - 502 from OpenRouter: Verify your `Authorization` is present in the request or set `OPENROUTER_API_KEY` on the server.
@@ -407,9 +439,10 @@ security:
 - Run locally without the launcher:
 
 ```
-cd Scrapitor/app
-python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m app.server
+cd Scrapitor
+python -m venv app\.venv
+app\.venv\Scripts\pip install -r app\requirements.txt
+app\.venv\Scripts\python -m app.server
 ```
 
 - Code layout: Flask app under `app/`, static assets in `app/static/`, templates in `app/templates/`, parser in `app/parser/`.
