@@ -32,7 +32,8 @@ If you prefer the shortest path, jump to [Installation](#installation) or [Casua
 - Sophisticated Parsing: Rule-driven, tag-aware extraction with include/omit and strip options; ideal for producing clean character sheets.
 - Full Customization: Include-only (whitelist) or omit (blacklist) modes, tag detection from logs, add-your-own tags, and chip-based toggling.
 - Versioned Exports: Every write is versioned (`.vN.txt`) with a version picker for quick navigation and comparisons.
-- Web Dashboard: Modern Svelte 5 SPA with reactive state management. View recent activity, copy endpoints, manage parser settings, detect tags, write outputs, and rename logs/exports inline.
+- SillyTavern Export: Export parsed content directly to SillyTavern-compatible JSON (chara_card_v3 spec) with one click. Supports both parser-based export and export from existing parsed TXT files.
+- Web Dashboard: Modern Svelte 5 SPA with reactive state management. View recent activity, copy endpoints, manage parser settings, detect tags, write outputs, export to SillyTavern, and rename logs/exports inline.
 
 
 ## Directory Structure
@@ -275,8 +276,8 @@ The dashboard is a Svelte 5 Single Page Application with TypeScript:
 
 - **Overview**: Shows total requests, log count, parsed file count, and server port.
 - **Setup**: Copy the Model Name Preset and your Cloudflare/Local endpoints.
-- **Parser**: Choose Default (no filtering) or Custom (Include/Exclude tags), auto-detect tags from logs, and write outputs.
-- **Activity**: Browse recent logs, open raw JSON, rename files, and view/rename parsed TXT versions. Features automatic prefetching of recent logs for instant loading.
+- **Parser**: Choose Default (no filtering) or Custom (Include/Exclude tags), auto-detect tags from logs, write outputs, and export to SillyTavern JSON.
+- **Activity**: Browse recent logs, open raw JSON, rename files, view/rename parsed TXT versions, and export TXT files to SillyTavern JSON with multi-select. Features automatic prefetching of recent logs for instant loading.
 
 
 ## Parser (Rules and CLI)
@@ -327,6 +328,8 @@ This section describes the full parser workflow and UI dynamics in the dashboard
 - TXT Navigation: In Activity, each log row shows a "TXT" button. Click it to open a version picker modal listing all parsed TXT files for that log, with size and modified time. Click a version to preview its contents.
 - Renaming Logs: Click the pencil icon next to a log name to rename its underlying JSON (and move the corresponding parsed directory to match the new name). Inline edit appears in place; Cancel or Save.
 - Renaming TXT Versions: In the TXT version picker modal, click the pencil icon next to a TXT entry to rename the parsed file inline.
+- Export to SillyTavern (Parser): In the Parser page, click "Export to SillyTavern" to write output and export to SillyTavern-compatible JSON (chara_card_v3 spec). Choose "Export Latest" to process the most recent log, or "Custom Selection" to pick specific logs from Activity. The exported JSON includes `name` (from the character tag), `description` (character content and untagged text), `scenario` (from the scenario tag if present), and `first_mes` (from the first assistant message).
+- Export to SillyTavern (Activity): In the TXT version picker modal, click "Export..." to enter selection mode. Select one or more parsed TXT files using checkboxes, then click "Export" to download them as SillyTavern JSON. The exported JSON uses the TXT filename (minus `.txt`) as the character name, content before "First Message" as the description, and content after "First Message" as `first_mes`.
 
 
 ## API Usage
@@ -382,6 +385,7 @@ Notes:
 - `GET /parser-settings` | `POST /parser-settings`: Get/set parser mode and tag lists.
 - `POST /parser-rewrite`: Rewrite latest/all or selected logs with current settings.
 - `GET /parser-tags`: Detect tags from latest or selected logs.
+- `POST /export-sillytavern`: Export to SillyTavern JSON. Supports `mode: "from_parser"` (parse logs with settings) or `mode: "from_txt"` (export from parsed TXT files).
 - `GET /tunnel`: Cloudflare public URL (if available).
 - `GET /health`: Basic health and port.
 
