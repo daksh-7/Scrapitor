@@ -303,13 +303,15 @@
 
   .tags-toolbar {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
   }
 
   .tags-toolbar .input-group {
-    max-width: 400px;
+    flex: 0 0 auto;
+    max-width: 300px;
   }
 
   .tags-grid {

@@ -38,9 +38,6 @@
       {#if !collapsed}
         <div class="brand-text">
           <span class="brand-name">Scrapitor</span>
-          <span class="status-indicator" title="Server running">
-            <span class="status-dot"></span>
-          </span>
         </div>
       {/if}
     </div>
@@ -183,11 +180,6 @@
     white-space: nowrap;
   }
 
-  .status-indicator {
-    display: flex;
-    align-items: center;
-  }
-
   .collapse-btn {
     width: 24px;
     height: 24px;
@@ -205,10 +197,6 @@
   .collapse-btn:hover {
     color: var(--text-primary);
     background: var(--bg-hover);
-  }
-
-  .collapsed .collapse-btn {
-    display: none;
   }
 
   .nav {
