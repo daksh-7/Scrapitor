@@ -1,4 +1,21 @@
-# scrapitor
+<p align="center">
+  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/frontend/public/assets/logo.png" alt="Scrapitor Logo" width="180" height="180">
+</p>
+
+<h1 align="center">scrapitor</h1>
+
+<p align="center">
+  <em>Intercept. Parse. Export. Your JanitorAI requests, beautifully captured.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PRs-welcome-0ea5e9?style=flat-square" alt="PRs Welcome">
+  <img src="https://img.shields.io/badge/Version-v2.0-3b82f6?style=flat-square" alt="Version v2.0">
+  <img src="https://img.shields.io/badge/Svelte-5-1d4ed8?style=flat-square" alt="Svelte 5">
+  <img src="https://img.shields.io/badge/Python-3.10+-1e3a8a?style=flat-square" alt="Python 3.10+">
+</p>
+
+---
 
 Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into SillyTavern-compatible clean character sheets using a rule-driven parser. Run it via the **Windows launcher (`run.bat`) (recommended)** or via Docker Compose.
 
