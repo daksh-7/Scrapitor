@@ -8,6 +8,7 @@ import type {
   TunnelResponse,
   HealthResponse,
   RenameResponse,
+  SillyTavernExportResponse,
 } from './types';
 
 class ApiError extends Error {
@@ -130,6 +131,23 @@ export async function rewriteParsed(options: {
   exclude_tags?: string[];
 }): Promise<RewriteResponse> {
   return request<RewriteResponse>('/parser-rewrite', {
+    method: 'POST',
+    body: JSON.stringify(options),
+  });
+}
+
+export async function exportToSillyTavern(options: {
+  mode: 'from_parser' | 'from_txt';
+  // For from_parser mode
+  log_files?: string[];
+  parser_mode?: 'default' | 'custom';
+  include_tags?: string[];
+  exclude_tags?: string[];
+  // For from_txt mode
+  log_name?: string;
+  txt_files?: string[];
+}): Promise<SillyTavernExportResponse> {
+  return request<SillyTavernExportResponse>('/export-sillytavern', {
     method: 'POST',
     body: JSON.stringify(options),
   });

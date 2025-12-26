@@ -15,7 +15,7 @@ class LogsStore {
   // Selection state
   selectedLogs = $state<Set<string>>(new Set());
   selectingLogs = $state(false);
-  selectionAction = $state<'write' | 'delete'>('write');
+  selectionAction = $state<'write' | 'delete' | 'export'>('write');
 
   // Cache for log content
   private jsonCache = new Map<string, string>();
@@ -122,7 +122,7 @@ class LogsStore {
   }
 
   // Selection methods
-  startSelection(action: 'write' | 'delete' = 'write') {
+  startSelection(action: 'write' | 'delete' | 'export' = 'write') {
     this.selectingLogs = true;
     this.selectionAction = action;
     this.selectedLogs = new Set();

@@ -5,6 +5,7 @@
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import { logsStore, parserStore, uiStore } from '$lib/stores';
+  import { exportToSillyTavern } from '$lib/api';
 
   let filterText = $state('');
   let logModalOpen = $state(false);
@@ -23,6 +24,10 @@
   let renamingParsedFile = $state<string | null>(null);
   let parsedRenameValue = $state('');
   let parsedRenameInputRef = $state<HTMLInputElement | null>(null);
+
+  // Parsed file selection for export
+  let selectedParsedFiles = $state<Set<string>>(new Set());
+  let selectingParsedFiles = $state(false);
 
   const filterLower = $derived(filterText.toLowerCase());
 
@@ -207,6 +212,103 @@
       }
     }, 100);
   }
+
+  // Export functions
+  function downloadJson(data: object, filename: string) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportSelectedLogs() {
+    const files = [...logsStore.selectedLogs];
+    if (files.length === 0) {
+      uiStore.notify('No files selected', 'info');
+      return;
+    }
+    try {
+      // First write the output
+      const writeResult = await parserStore.rewrite('custom', files);
+      
+      // Then export to SillyTavern
+      const exportResult = await parserStore.exportSillyTavern('custom', files);
+      
+      if (exportResult.exports.length > 0) {
+        for (const exp of exportResult.exports) {
+          downloadJson(exp.json, exp.filename);
+        }
+        uiStore.notify(`Wrote ${writeResult.rewritten} file(s), exported ${exportResult.count} to SillyTavern`);
+      } else {
+        uiStore.notify(`Wrote ${writeResult.rewritten} file(s), no exports generated`, 'info');
+      }
+      logsStore.cancelSelection();
+      await logsStore.refresh();
+    } catch {
+      // Error handled by store
+    }
+  }
+
+  // Parsed file export functions
+  function toggleParsedFileSelection(fileName: string) {
+    const newSet = new Set(selectedParsedFiles);
+    if (newSet.has(fileName)) {
+      newSet.delete(fileName);
+    } else {
+      newSet.add(fileName);
+    }
+    selectedParsedFiles = newSet;
+  }
+
+  function toggleSelectAllParsed() {
+    if (selectedParsedFiles.size === parsedVersions.length) {
+      selectedParsedFiles = new Set();
+    } else {
+      selectedParsedFiles = new Set(parsedVersions.map(v => v.file));
+    }
+  }
+
+  function startParsedExportSelection() {
+    selectingParsedFiles = true;
+    selectedParsedFiles = new Set();
+  }
+
+  function cancelParsedExportSelection() {
+    selectingParsedFiles = false;
+    selectedParsedFiles = new Set();
+  }
+
+  async function exportSelectedParsedFiles() {
+    const files = [...selectedParsedFiles];
+    if (files.length === 0) {
+      uiStore.notify('No files selected', 'info');
+      return;
+    }
+    try {
+      const result = await exportToSillyTavern({
+        mode: 'from_txt',
+        log_name: parsedModalLogName,
+        txt_files: files,
+      });
+      
+      if (result.exports.length > 0) {
+        for (const exp of result.exports) {
+          downloadJson(exp.json, exp.filename);
+        }
+        uiStore.notify(`Exported ${result.count} file(s) to SillyTavern`);
+      } else {
+        uiStore.notify('No exports generated', 'info');
+      }
+      cancelParsedExportSelection();
+    } catch (e) {
+      uiStore.notify(e instanceof Error ? e.message : 'Export failed', 'error');
+    }
+  }
 </script>
 
 <div class="activity-page">
@@ -239,6 +341,11 @@
               <button class="btn btn-sm btn-accent" onclick={rewriteSelected}>
                 <Icon name="write" size={12} />
                 Write Selected
+              </button>
+            {:else if logsStore.selectionAction === 'export'}
+              <button class="btn btn-sm btn-accent" onclick={exportSelectedLogs}>
+                <Icon name="export" size={12} />
+                Export Selected
               </button>
             {:else}
               <button class="btn btn-sm btn-danger" onclick={deleteSelected}>
@@ -307,14 +414,37 @@
 <Modal
   open={parsedModalOpen}
   title={parsedModalTitle}
-  onClose={() => { parsedModalOpen = false; renamingParsedFile = null; }}
+  onClose={() => { parsedModalOpen = false; renamingParsedFile = null; cancelParsedExportSelection(); }}
 >
   {#snippet children()}
     <div class="version-picker">
-      <p class="version-header">Select a version to view:</p>
+      <div class="version-toolbar">
+        {#if selectingParsedFiles}
+          <span class="selection-count">
+            {selectedParsedFiles.size} selected
+          </span>
+          <button class="btn btn-sm" onclick={toggleSelectAllParsed}>
+            <Icon name="checkSquare" size={12} />
+            {selectedParsedFiles.size === parsedVersions.length ? 'Deselect All' : 'Select All'}
+          </button>
+          <button class="btn btn-sm btn-accent" onclick={exportSelectedParsedFiles}>
+            <Icon name="export" size={12} />
+            Export
+          </button>
+          <button class="btn btn-sm" onclick={cancelParsedExportSelection}>
+            Cancel
+          </button>
+        {:else}
+          <p class="version-header">Select a version to view:</p>
+          <button class="btn btn-sm" onclick={startParsedExportSelection}>
+            <Icon name="export" size={12} />
+            Export...
+          </button>
+        {/if}
+      </div>
       <div class="version-list">
         {#each parsedVersions as version (version.file)}
-          <div class="version-item" class:renaming={renamingParsedFile === version.file}>
+          <div class="version-item" class:renaming={renamingParsedFile === version.file} class:selecting={selectingParsedFiles} class:selected={selectedParsedFiles.has(version.file)}>
             {#if renamingParsedFile === version.file}
               <div class="version-rename-wrapper">
                 <input 
@@ -343,6 +473,16 @@
                   <Icon name="close" size={12} />
                 </button>
               </div>
+            {:else if selectingParsedFiles}
+              <label class="version-select-wrapper">
+                <input 
+                  type="checkbox"
+                  checked={selectedParsedFiles.has(version.file)}
+                  onchange={() => toggleParsedFileSelection(version.file)}
+                />
+                <span class="version-name mono">{version.file}</span>
+                <span class="version-meta">{formatDate(version.mtime)} · {formatSize(version.size)}</span>
+              </label>
             {:else}
               <button 
                 class="version-content"
@@ -467,10 +607,28 @@
     word-break: normal;
   }
 
+  .version-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .version-toolbar .selection-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 4px 8px;
+    background: var(--accent-subtle);
+    border-radius: var(--radius-sm);
+  }
+
   .version-header {
     font-weight: 500;
     color: var(--text-secondary);
-    margin-bottom: var(--space-md);
+    margin: 0;
+    flex: 1;
   }
 
   .version-list {
@@ -500,6 +658,34 @@
   .version-item.renaming {
     border-color: var(--accent);
     background: var(--bg-hover);
+  }
+
+  .version-item.selecting {
+    cursor: pointer;
+  }
+
+  .version-item.selecting.selected {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .version-select-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+  }
+
+  .version-select-wrapper input[type="checkbox"] {
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .version-select-wrapper .version-name {
+    flex: 1;
+    min-width: 0;
   }
 
   .version-content {

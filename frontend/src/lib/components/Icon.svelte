@@ -26,7 +26,9 @@
     | 'warning'
     | 'info'
     | 'error'
-    | 'edit';
+    | 'edit'
+    | 'download'
+    | 'export';
 
   let { name, size = 16, class: className = '' }: Props = $props();
 </script>
@@ -110,6 +112,14 @@
   {:else if name === 'edit'}
     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  {:else if name === 'download'}
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  {:else if name === 'export'}
+    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+    <polyline points="17 8 12 3 7 8"/>
+    <line x1="12" y1="3" x2="12" y2="15"/>
   {/if}
 </svg>
 

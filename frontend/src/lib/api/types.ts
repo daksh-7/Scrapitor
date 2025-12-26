@@ -89,3 +89,17 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface SillyTavernExport {
+  name: string;
+  filename: string;
+  source_log?: string;
+  source_txt?: string;
+  json: Record<string, unknown>;
+}
+
+export interface SillyTavernExportResponse {
+  exports: SillyTavernExport[];
+  count: number;
+  error?: string;
+}
+

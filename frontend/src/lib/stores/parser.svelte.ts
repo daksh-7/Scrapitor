@@ -1,4 +1,4 @@
-import { getParserSettings, saveParserSettings, getParserTags, rewriteParsed } from '$lib/api';
+import { getParserSettings, saveParserSettings, getParserTags, rewriteParsed, exportToSillyTavern } from '$lib/api';
 
 class ParserStore {
   // Settings
@@ -180,6 +180,28 @@ class ParserStore {
     const newExclude = new Set(this.excludeTags);
     newExclude.add(key);
     this.excludeTags = newExclude;
+  }
+
+  // Export to SillyTavern
+  async exportSillyTavern(mode: 'latest' | 'custom', files?: string[]) {
+    this.loading = true;
+    this.error = null;
+
+    try {
+      const result = await exportToSillyTavern({
+        mode: 'from_parser',
+        log_files: mode === 'custom' && files ? files : undefined,
+        parser_mode: this.mode,
+        include_tags: [...this.includeTags],
+        exclude_tags: [...this.excludeTags],
+      });
+      return result;
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'Export failed';
+      throw e;
+    } finally {
+      this.loading = false;
+    }
   }
 }
 

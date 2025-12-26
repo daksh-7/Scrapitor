@@ -186,6 +186,63 @@ def _prune_logs() -> None:
         except Exception as e:
             log.warning(f"Failed to delete old log {old.name}: {e}")
 
+def _build_sillytavern_json(name: str, description: str, scenario: str, first_mes: str) -> dict:
+    """Build a SillyTavern-compatible character card JSON (chara_card_v3 spec)."""
+    # Normalize newlines to \r\n for SillyTavern compatibility
+    def norm(s: str) -> str:
+        return s.replace('\r\n', '\n').replace('\n', '\r\n').strip()
+    
+    name = name.strip()
+    description = norm(description)
+    scenario = norm(scenario)
+    first_mes = norm(first_mes)
+    
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    
+    return {
+        "name": name,
+        "description": description,
+        "personality": "",
+        "scenario": scenario,
+        "first_mes": first_mes,
+        "mes_example": "",
+        "creatorcomment": "",
+        "avatar": "none",
+        "talkativeness": "0.5",
+        "fav": False,
+        "tags": [],
+        "spec": "chara_card_v3",
+        "spec_version": "3.0",
+        "data": {
+            "name": name,
+            "description": description,
+            "personality": "",
+            "scenario": scenario,
+            "first_mes": first_mes,
+            "mes_example": "",
+            "creator_notes": "",
+            "system_prompt": "",
+            "post_history_instructions": "",
+            "tags": [],
+            "creator": "",
+            "character_version": "",
+            "alternate_greetings": [],
+            "extensions": {
+                "talkativeness": "0.5",
+                "fav": False,
+                "world": "",
+                "depth_prompt": {
+                    "prompt": "",
+                    "depth": 4,
+                    "role": "system"
+                }
+            },
+            "group_only_greetings": []
+        },
+        "create_date": now
+    }
+
+
 def _save_log(payload: dict) -> None:
     try:
         path = LOG_DIR / f"{_safe_name(_ts())}.json"
@@ -879,6 +936,226 @@ def create_app() -> Flask:
             "by_file": file_to_tags,
             "by_tag": tag_to_files,
         })
+
+    @app.route("/export-sillytavern", methods=["POST"])
+    def export_sillytavern():
+        """Export parsed content to SillyTavern-compatible JSON.
+
+        Supports two modes:
+        - from_parser: Parse tagged JSON log files and export based on parser settings
+        - from_txt: Export from existing parsed TXT files
+        """
+        data = request.get_json(silent=True) or {}
+        mode = str(data.get("mode", "from_txt")).lower()
+
+        def _norm_list(v):
+            if isinstance(v, str):
+                return [s.strip() for s in v.split(',') if s.strip()]
+            if isinstance(v, list):
+                return [str(s).strip() for s in v if str(s).strip()]
+            return []
+
+        exports = []
+
+        if mode == "from_parser":
+            # Export from parser: parse the JSON log file and extract content by tags
+            log_files = _norm_list(data.get("log_files", data.get("files", [])))
+            parser_mode = str(data.get("parser_mode", "default")).lower()
+            include_tags = set(t.lower() for t in _norm_list(data.get("include_tags", [])))
+            exclude_tags = set(t.lower() for t in _norm_list(data.get("exclude_tags", [])))
+
+            # Resolve log files
+            targets = []
+            if log_files:
+                for raw in log_files:
+                    resolved = _resolve_log_path(raw)
+                    if resolved:
+                        targets.append(resolved)
+            else:
+                # Default to latest
+                files = sorted(LOG_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+                if files:
+                    targets = [files[0]]
+
+            for log_path in targets:
+                try:
+                    log_data = json.loads(log_path.read_text(encoding='utf-8'))
+                    msgs = log_data.get('messages', [])
+                    if not msgs or not isinstance(msgs[0], dict) or msgs[0].get('role') != 'system':
+                        continue
+
+                    system_content = str(msgs[0].get('content', '')).replace('\\n', '\n')
+
+                    # Find all tags in system content
+                    all_tags = set()
+                    for m in re.finditer(r"<\s*([^<>/]+?)\s*>", system_content, re.IGNORECASE):
+                        tag_name = m.group(1).strip().split()[0]
+                        if tag_name:
+                            all_tags.add(tag_name.lower())
+
+                    # Determine which tags to include based on mode
+                    if parser_mode == "custom" and include_tags:
+                        active_tags = include_tags
+                    elif parser_mode == "custom" and exclude_tags:
+                        active_tags = all_tags - exclude_tags
+                    else:
+                        active_tags = all_tags
+
+                    # Extract character name (first non-system tag)
+                    skip_tags = {'system', 'scenario', 'example_dialogs', 'persona', 'userpersona'}
+                    char_name = "character"
+                    for m in re.finditer(r"<\s*([^<>/]+?)\s*>", system_content, re.IGNORECASE):
+                        tag_name = m.group(1).strip()
+                        base_name = tag_name.split()[0].lower()
+                        if base_name and base_name not in skip_tags:
+                            char_name = tag_name
+                            break
+
+                    # Extract scenario content
+                    scenario_content = ""
+                    sc_match = re.search(r"<\s*scenario\b[^>]*>", system_content, re.IGNORECASE)
+                    if sc_match and "scenario" in active_tags:
+                        sc_start = sc_match.end()
+                        depth = 1
+                        sc_end = len(system_content)
+                        pos = sc_start
+                        while depth > 0 and pos < len(system_content):
+                            open_m = re.search(r"<\s*scenario\b[^>]*>", system_content[pos:], re.IGNORECASE)
+                            close_m = re.search(r"</\s*scenario\s*>", system_content[pos:], re.IGNORECASE)
+                            if not close_m:
+                                break
+                            if open_m and open_m.start() < close_m.start():
+                                depth += 1
+                                pos += open_m.end()
+                            else:
+                                depth -= 1
+                                if depth == 0:
+                                    sc_end = pos + close_m.start()
+                                pos += close_m.end()
+                        scenario_content = system_content[sc_start:sc_end].strip()
+
+                    # Extract first assistant message
+                    first_mes = ""
+                    if "first_message" in active_tags or not include_tags:
+                        for msg in msgs:
+                            if isinstance(msg, dict) and msg.get('role') == 'assistant':
+                                content = msg.get('content', '')
+                                if content and content.strip():
+                                    first_mes = str(content).replace('\\n', '\n').strip()
+                                    break
+
+                    # Build description from remaining content
+                    description_parts = []
+
+                    # Add untagged content if not excluded
+                    stripped = system_content
+                    for tag in all_tags:
+                        stripped = _remove_tag_blocks(stripped, tag)
+                    stripped = re.sub(r"</?[^<>/]+?[^<>]*>", "", stripped).strip()
+                    if stripped and ("untagged content" in active_tags or "untagged content" not in exclude_tags):
+                        description_parts.append(stripped)
+
+                    # Add character block content (excluding scenario)
+                    char_base = char_name.split()[0].lower()
+                    if char_base in active_tags or (not include_tags and char_base not in exclude_tags):
+                        char_match = re.search(rf"<\s*{re.escape(char_name)}\b[^>]*>", system_content, re.IGNORECASE)
+                        if char_match:
+                            ch_start = char_match.end()
+                            depth = 1
+                            ch_end = len(system_content)
+                            pos = ch_start
+                            open_re = re.compile(rf"<\s*{re.escape(char_name.split()[0])}\b[^>]*>", re.IGNORECASE)
+                            close_re = re.compile(rf"</\s*{re.escape(char_name.split()[0])}\s*>", re.IGNORECASE)
+                            while depth > 0 and pos < len(system_content):
+                                open_m = open_re.search(system_content, pos)
+                                close_m = close_re.search(system_content, pos)
+                                if not close_m:
+                                    break
+                                if open_m and open_m.start() < close_m.start():
+                                    depth += 1
+                                    pos = open_m.end()
+                                else:
+                                    depth -= 1
+                                    if depth == 0:
+                                        ch_end = close_m.start()
+                                    pos = close_m.end()
+                            char_content = system_content[ch_start:ch_end].strip()
+                            # Remove scenario from char content if present
+                            char_content = _remove_tag_blocks(char_content, "scenario")
+                            if char_content:
+                                description_parts.append(char_content)
+
+                    description = "\n\n".join(description_parts)
+
+                    # Build the JSON
+                    st_json = _build_sillytavern_json(char_name, description, scenario_content, first_mes)
+                    safe_filename = re.sub(r"[^0-9A-Za-z _\-()&]+", "_", char_name).strip() or "character"
+
+                    exports.append({
+                        "name": char_name,
+                        "filename": f"{safe_filename}.json",
+                        "source_log": log_path.name,
+                        "json": st_json,
+                    })
+                except Exception as e:
+                    log.warning(f"Failed to export {log_path.name}: {e}")
+                    continue
+
+        else:  # mode == "from_txt"
+            # Export from existing parsed TXT files
+            log_name = str(data.get("log_name", "")).strip()
+            txt_files = _norm_list(data.get("txt_files", []))
+
+            if not log_name or not txt_files:
+                return jsonify({"exports": [], "count": 0, "error": "log_name and txt_files required"}), 400
+
+            # Resolve log directory
+            safe = _safe_name(log_name)
+            if safe.endswith(".json"):
+                stem = pathlib.Path(safe).stem
+            else:
+                stem = safe
+            base_dir = _parsed_output_dir_for(LOG_DIR / f"{stem}.json")
+
+            for txt_file in txt_files:
+                try:
+                    txt_path = (base_dir / pathlib.Path(txt_file).name).resolve()
+                    if not txt_path.exists() or txt_path.suffix.lower() != '.txt':
+                        continue
+
+                    content = txt_path.read_text(encoding='utf-8-sig')
+
+                    # Name is filename minus .txt
+                    name = txt_path.stem
+
+                    # Split by "First Message" marker
+                    first_mes_marker = "First Message"
+                    description = ""
+                    first_mes = ""
+                    scenario = ""
+
+                    if first_mes_marker in content:
+                        parts = content.split(first_mes_marker, 1)
+                        description = parts[0].strip()
+                        first_mes = parts[1].strip() if len(parts) > 1 else ""
+                    else:
+                        description = content.strip()
+
+                    # Build the JSON
+                    st_json = _build_sillytavern_json(name, description, scenario, first_mes)
+                    safe_filename = re.sub(r"[^0-9A-Za-z _\-()&]+", "_", name).strip() or "character"
+
+                    exports.append({
+                        "name": name,
+                        "filename": f"{safe_filename}.json",
+                        "source_txt": txt_file,
+                        "json": st_json,
+                    })
+                except Exception as e:
+                    log.warning(f"Failed to export {txt_file}: {e}")
+                    continue
+
+        return jsonify({"exports": exports, "count": len(exports)})
 
     @app.route("/health")
     def health():
