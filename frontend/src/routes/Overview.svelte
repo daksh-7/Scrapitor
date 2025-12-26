@@ -1,10 +1,11 @@
 <script lang="ts">
   import Section from '$lib/components/Section.svelte';
   import MetricCard from '$lib/components/MetricCard.svelte';
+  import Icon from '$lib/components/Icon.svelte';
   import { logsStore, uiStore } from '$lib/stores';
 </script>
 
-<Section id="overview" title="Overview">
+<div class="overview-page">
   <div class="metrics-grid">
     <MetricCard 
       title="Total Requests" 
@@ -12,9 +13,7 @@
       label="Since startup"
     >
       {#snippet icon()}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-        </svg>
+        <Icon name="activity" size={20} />
       {/snippet}
     </MetricCard>
 
@@ -24,12 +23,7 @@
       label="In logs folder"
     >
       {#snippet icon()}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
+        <Icon name="grid" size={20} />
       {/snippet}
     </MetricCard>
 
@@ -39,10 +33,7 @@
       label="All versions"
     >
       {#snippet icon()}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 20l9-5-9-5-9 5 9 5z"/>
-          <path d="M3 10l9-5 9 5"/>
-        </svg>
+        <Icon name="layers" size={20} />
       {/snippet}
     </MetricCard>
 
@@ -52,28 +43,110 @@
       label="Listening on"
     >
       {#snippet icon()}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2"/>
-          <rect x="9" y="9" width="6" height="6"/>
-        </svg>
+        <Icon name="server" size={20} />
       {/snippet}
     </MetricCard>
   </div>
-</Section>
+
+  {#if uiStore.cloudflareUrl}
+    <Section id="endpoints">
+      <div class="endpoints-row">
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="endpoint-label">Cloudflare Tunnel</span>
+            <span class="endpoint-status">
+              <span class="status-dot status-dot--pulse"></span>
+              Active
+            </span>
+          </div>
+          <code class="endpoint-url">{uiStore.cloudflareUrl}</code>
+        </div>
+        <div class="endpoint-card">
+          <div class="endpoint-header">
+            <span class="endpoint-label">Local Server</span>
+            <span class="endpoint-status">
+              <span class="status-dot"></span>
+              Active
+            </span>
+          </div>
+          <code class="endpoint-url">{uiStore.localUrl}</code>
+        </div>
+      </div>
+    </Section>
+  {/if}
+</div>
 
 <style>
+  .overview-page {
+    animation: fadeInUp var(--duration-normal) var(--ease-out);
+  }
+
   .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+  }
+
+  .metrics-grid > :global(*) {
+    opacity: 0;
+    animation: fadeInUp var(--duration-normal) var(--ease-out) forwards;
+  }
+
+  .metrics-grid > :global(*:nth-child(1)) { animation-delay: 0.05s; }
+  .metrics-grid > :global(*:nth-child(2)) { animation-delay: 0.1s; }
+  .metrics-grid > :global(*:nth-child(3)) { animation-delay: 0.15s; }
+  .metrics-grid > :global(*:nth-child(4)) { animation-delay: 0.2s; }
+
+  .endpoints-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: var(--space-lg);
-    margin-bottom: var(--space-lg);
   }
 
-  @media (max-width: 768px) {
+  .endpoint-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg) var(--space-xl);
+  }
+
+  .endpoint-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+  }
+
+  .endpoint-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .endpoint-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .endpoint-url {
+    display: block;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px) {
     .metrics-grid {
       grid-template-columns: 1fr;
     }
   }
 </style>
-
-

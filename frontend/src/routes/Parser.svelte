@@ -1,6 +1,8 @@
 <script lang="ts">
   import Section from '$lib/components/Section.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
+  import LogItem from '$lib/components/LogItem.svelte';
+  import Icon from '$lib/components/Icon.svelte';
   import { parserStore, logsStore, uiStore } from '$lib/stores';
 
   let newTagInput = $state('');
@@ -79,89 +81,63 @@
   }
 </script>
 
-<Section id="parser" title="Parser">
-  <div class="parameter-grid">
-    <div class="parameter-card">
-      <div class="parameter-header">
-        <span class="parameter-name">Mode</span>
-        <span class="parameter-value">{parserStore.mode === 'custom' ? 'Custom' : 'Default'}</span>
-      </div>
-      <div class="mode-group">
-        <label class="mode-pill" class:active={parserStore.mode === 'default'}>
-          <input 
-            type="radio" 
-            name="parser_mode" 
-            value="default" 
-            checked={parserStore.mode === 'default'}
-            onchange={() => parserStore.setMode('default')}
-          />
-          Default
-        </label>
-        <label class="mode-pill" class:active={parserStore.mode === 'custom'}>
-          <input 
-            type="radio" 
-            name="parser_mode" 
-            value="custom"
-            checked={parserStore.mode === 'custom'}
-            onchange={() => parserStore.setMode('custom')}
-          />
-          Custom
-        </label>
-      </div>
-      <div class="metric-label">
-        <strong>Default</strong>: no tag filtering; writes character content, Scenario (if present), and First Message. 
-        <strong>Custom</strong>: use chips to Include/Exclude; if any tags are Included, only those are written.
-      </div>
+<div class="parser-page">
+  <Section id="mode" title="Parser Mode">
+    <div class="mode-selector">
+      <button 
+        class="mode-option"
+        class:active={parserStore.mode === 'default'}
+        onclick={() => parserStore.setMode('default')}
+      >
+        <span class="mode-name">Default</span>
+        <span class="mode-desc">No tag filtering. Writes character content, Scenario, and First Message.</span>
+      </button>
+      <button 
+        class="mode-option"
+        class:active={parserStore.mode === 'custom'}
+        onclick={() => parserStore.setMode('custom')}
+      >
+        <span class="mode-name">Custom</span>
+        <span class="mode-desc">Use chips to Include/Exclude tags. Only included tags are written.</span>
+      </button>
     </div>
+  </Section>
 
-    {#if parserStore.isCustomMode}
-      <div class="parameter-card">
-        <div class="parameter-header">
-          <span class="parameter-name">Tags</span>
-          <div class="action-bar">
-            <button class="toolbar-btn" onclick={() => parserStore.includeAll()} aria-label="Include all tags">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
-                <rect x="3" y="3" width="18" height="18" rx="4"/>
-              </svg>
-              <span class="btn-label">Include All</span>
-            </button>
-            <button class="toolbar-btn toolbar-btn--danger" onclick={() => parserStore.excludeAll()} aria-label="Exclude all tags">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18" stroke-linecap="round"/>
-                <path d="M10 11v6M14 11v6"/>
-              </svg>
-              <span class="btn-label">Clear All</span>
-            </button>
-            <button class="toolbar-btn toolbar-btn--accent" onclick={detectLatest} aria-label="Detect tags from latest log">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 8v4l3 2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="12" cy="12" r="9"/>
-              </svg>
-              <span class="btn-label">Detect Latest</span>
-            </button>
-            <button class="toolbar-btn toolbar-btn--accent" onclick={openTagDetectModal} aria-label="Detect tags from selected logs">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="7" height="6" rx="1"/>
-                <rect x="14" y="4" width="7" height="6" rx="1"/>
-                <rect x="3" y="14" width="7" height="6" rx="1"/>
-                <rect x="14" y="14" width="7" height="6" rx="1"/>
-              </svg>
-              <span class="btn-label">Detect From Logs</span>
-            </button>
-          </div>
-        </div>
+  {#if parserStore.isCustomMode}
+    <Section id="tags" title="Tags">
+      <div class="tags-toolbar">
         <div class="input-group">
           <input 
-            class="copy-input" 
-            placeholder="Add tag and press Enter" 
+            class="input" 
+            placeholder="Add new tag..." 
             aria-label="New tag name"
             bind:value={newTagInput}
             onkeypress={(e) => e.key === 'Enter' && addTag()}
           />
-          <button class="button" onclick={addTag} aria-label="Add tag">Add</button>
+          <button class="btn btn-primary" onclick={addTag}>Add</button>
         </div>
-        <div class="chips">
+        <div class="action-bar">
+          <button class="btn" onclick={() => parserStore.includeAll()}>
+            <Icon name="check" size={14} />
+            Include All
+          </button>
+          <button class="btn btn-danger" onclick={() => parserStore.excludeAll()}>
+            <Icon name="close" size={14} />
+            Clear All
+          </button>
+          <button class="btn btn-accent" onclick={detectLatest}>
+            <Icon name="detect" size={14} />
+            Detect Latest
+          </button>
+          <button class="btn" onclick={openTagDetectModal}>
+            <Icon name="grid" size={14} />
+            Detect From...
+          </button>
+        </div>
+      </div>
+      
+      {#if parserStore.sortedTags.length > 0}
+        <div class="tags-grid">
           {#each parserStore.sortedTags as tag}
             <TagChip 
               {tag}
@@ -170,26 +146,25 @@
             />
           {/each}
         </div>
-      </div>
-    {/if}
-  </div>
+      {:else}
+        <div class="empty-tags">
+          <p>No tags detected yet. Click "Detect Latest" to scan the most recent log.</p>
+        </div>
+      {/if}
+    </Section>
+  {/if}
 
-  <div class="action-bar">
-    <button class="toolbar-btn toolbar-btn--accent" onclick={saveSettings} aria-label="Save parser settings">
-      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 4h16v16H4z"/>
-        <path d="M7 4v6h10V4"/>
-      </svg>
-      <span class="btn-label">Save Settings</span>
+  <div class="parser-actions">
+    <button class="btn btn-primary" onclick={saveSettings}>
+      <Icon name="save" size={14} />
+      Save Settings
     </button>
-    <button class="toolbar-btn toolbar-btn--accent" onclick={() => writeModalOpen = true} aria-label="Open write options">
-      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 20l9-5-9-5-9 5 9 5z"/>
-      </svg>
-      <span class="btn-label">Write</span>
+    <button class="btn btn-accent" onclick={() => writeModalOpen = true}>
+      <Icon name="write" size={14} />
+      Write Output
     </button>
   </div>
-</Section>
+</div>
 
 <!-- Tag Detect Modal -->
 {#if tagDetectModalOpen}
@@ -197,17 +172,28 @@
     <button class="modal-backdrop" onclick={() => tagDetectModalOpen = false} aria-label="Close modal"></button>
     <div class="modal-panel modal-panel--md">
       <div class="modal-header">
-        <div class="modal-title">Detect Tags From Logs</div>
-        <div class="modal-actions action-bar">
-          <button class="toolbar-btn" onclick={() => tagDetectModalOpen = false}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">Close</span>
+        <h2 class="modal-title">Detect Tags From Logs</h2>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick={() => tagDetectModalOpen = false}>
+            <Icon name="close" size={14} />
           </button>
         </div>
       </div>
       <div class="modal-body">
+        <div class="detect-toolbar">
+          <button class="btn btn-sm btn-accent" onclick={confirmTagDetect}>
+            <Icon name="detect" size={12} />
+            Detect
+          </button>
+          <button class="btn btn-sm" onclick={toggleTagDetectAll}>
+            <Icon name="checkSquare" size={12} />
+            {tagDetectSelected.size === logsStore.logs.length ? 'Deselect All' : 'Select All'}
+          </button>
+          <button class="btn btn-sm" onclick={() => tagDetectSelected = new Set()}>
+            <Icon name="close" size={12} />
+            Clear
+          </button>
+        </div>
         <div class="detect-list">
           {#each logsStore.logs as log}
             <label class="detect-item">
@@ -224,31 +210,9 @@
                   tagDetectSelected = newSet;
                 }}
               />
-              <span>{log}</span>
+              <span class="mono">{log}</span>
             </label>
           {/each}
-        </div>
-        <div class="action-bar" style="margin-top: 0.75rem;">
-          <button class="toolbar-btn toolbar-btn--accent" onclick={confirmTagDetect}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 8v4l3 2" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="12" cy="12" r="9"/>
-            </svg>
-            <span class="btn-label">Detect</span>
-          </button>
-          <button class="toolbar-btn" onclick={toggleTagDetectAll}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">Select All</span>
-          </button>
-          <button class="toolbar-btn toolbar-btn--danger" onclick={() => tagDetectSelected = new Set()}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 6h18" stroke-linecap="round"/>
-              <path d="M10 11v6M14 11v6"/>
-            </svg>
-            <span class="btn-label">Clear</span>
-          </button>
         </div>
       </div>
     </div>
@@ -261,108 +225,206 @@
     <button class="modal-backdrop" onclick={() => writeModalOpen = false} aria-label="Close modal"></button>
     <div class="modal-panel modal-panel--sm">
       <div class="modal-header">
-        <div class="modal-title">Write Options</div>
-        <div class="modal-actions action-bar">
-          <button class="toolbar-btn" onclick={() => writeModalOpen = false}>
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">Close</span>
+        <h2 class="modal-title">Write Output</h2>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick={() => writeModalOpen = false}>
+            <Icon name="close" size={14} />
           </button>
         </div>
       </div>
       <div class="modal-body">
-        <div class="write-options">
-          <button class="button" onclick={writeLatest}>Write Latest</button>
-          <button class="button button-secondary" onclick={startCustomSelection}>Custom Selection…</button>
-        </div>
-        <p class="write-hint">
-          Choose Latest to write the most recent JSON, or Custom to select files from Activity.
+        <p class="write-description">
+          Choose how to generate parsed TXT output from your logs.
         </p>
+        <div class="write-options">
+          <button class="write-option" onclick={writeLatest}>
+            <span class="write-option-title">Write Latest</span>
+            <span class="write-option-desc">Process the most recent log file</span>
+          </button>
+          <button class="write-option" onclick={startCustomSelection}>
+            <span class="write-option-title">Custom Selection</span>
+            <span class="write-option-desc">Choose specific files from Activity</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .mode-group {
+  .parser-page {
+    animation: fadeInUp var(--duration-normal) var(--ease-out);
+  }
+
+  .mode-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .mode-option {
     display: flex;
-    gap: var(--space-sm);
-  }
-
-  .mode-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-md);
+    background: var(--bg-elevated);
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-full);
-    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-    font-weight: 500;
+    text-align: left;
+    transition: 
+      border-color var(--duration-fast),
+      background-color var(--duration-fast);
+  }
+
+  .mode-option:hover {
+    border-color: var(--border-strong);
+  }
+
+  .mode-option.active {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .mode-name {
     font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .mode-pill input[type="radio"] {
-    display: none;
-  }
-
-  .mode-pill:hover {
-    border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.04);
+    font-weight: 600;
     color: var(--text-primary);
   }
 
-  .mode-pill.active {
-    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-    border-color: transparent;
-    color: var(--bg-primary);
+  .mode-option.active .mode-name {
+    color: var(--accent);
   }
 
-  .chips {
+  .mode-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .tags-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+
+  .tags-toolbar .input-group {
+    max-width: 400px;
+  }
+
+  .tags-grid {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-sm);
-    margin-top: 0.75rem;
   }
 
-  /* Modal size variants (uses shared modal styles from app.css) */
-  .modal-panel--sm {
-    width: min(400px, 90vw);
+  .empty-tags {
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--border-default);
   }
 
-  .modal-panel--md {
-    width: min(600px, 90vw);
+  .parser-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+  }
+
+  .detect-toolbar {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
   }
 
   .detect-list {
     max-height: 50vh;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .detect-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0;
-    border-bottom: 1px solid var(--border-subtle);
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
     cursor: pointer;
+    transition: background-color var(--duration-fast);
   }
 
-  .detect-item:last-child {
-    border-bottom: 0;
+  .detect-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .detect-item span {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .write-description {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-lg);
+    line-height: 1.5;
   }
 
   .write-options {
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: var(--space-sm);
   }
 
-  .write-hint {
-    margin-top: 0.75rem;
-    color: var(--text-tertiary);
+  .write-option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: 
+      border-color var(--duration-fast),
+      background-color var(--duration-fast);
+  }
+
+  .write-option:hover {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+  }
+
+  .write-option-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .write-option-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 640px) {
+    .tags-toolbar {
+      flex-direction: column;
+    }
+
+    .tags-toolbar .input-group {
+      max-width: none;
+    }
+
+    .parser-actions {
+      flex-direction: column;
+    }
+
+    .parser-actions .btn {
+      width: 100%;
+    }
   }
 </style>

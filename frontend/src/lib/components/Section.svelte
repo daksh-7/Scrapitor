@@ -3,42 +3,49 @@
 
   interface Props {
     id: string;
-    title: string;
+    title?: string;
     children: Snippet;
   }
 
   let { id, title, children }: Props = $props();
 </script>
 
-<section {id} class="section" aria-labelledby="{id}-title">
-  <h2 id="{id}-title" class="section-header">{title}</h2>
-  {@render children()}
+<section {id} class="section fade-in-up" aria-labelledby={title ? `${id}-title` : undefined}>
+  {#if title}
+    <h2 id="{id}-title" class="section-header">{title}</h2>
+  {/if}
+  <div class="section-content">
+    {@render children()}
+  </div>
 </section>
 
 <style>
   .section {
-    background: var(--surface-primary);
+    background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
-    padding: var(--space-xl);
-    margin-bottom: var(--space-lg);
-    position: relative;
+    margin-bottom: var(--space-xl);
+    overflow: hidden;
   }
 
   .section-header {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: var(--space-xl);
-    background: linear-gradient(135deg, 
-      var(--accent-primary) 0%, 
-      var(--accent-secondary) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    letter-spacing: -0.03em;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: var(--space-md) var(--space-xl);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
   }
 
+  .section-content {
+    padding: var(--space-xl);
+  }
+
+  @media (max-width: 640px) {
+    .section-content {
+      padding: var(--space-lg);
+    }
+  }
 </style>

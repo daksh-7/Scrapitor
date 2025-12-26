@@ -1,5 +1,6 @@
 <script lang="ts">
   import Section from '$lib/components/Section.svelte';
+  import Icon from '$lib/components/Icon.svelte';
   import { uiStore } from '$lib/stores';
 
   let helpVisible = $state(false);
@@ -9,219 +10,302 @@
   }
 </script>
 
-<Section id="setup" title="Setup">
-  <div class="parameter-grid">
-    <div class="parameter-card">
-      <div class="parameter-header">
-        <span class="parameter-name">Model Name Preset</span>
-      </div>
-      <div class="input-group">
-        <input 
-          type="text" 
-          class="copy-input" 
-          value="mistralai/devstral-2512:free" 
-          readonly 
-          aria-label="Model Name Preset" 
-        />
-        <button 
-          class="toolbar-btn toolbar-btn--accent" 
-          onclick={() => copyText('mistralai/devstral-2512:free')}
-          aria-label="Copy model name"
-        >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <rect x="2" y="2" width="13" height="13" rx="2"/>
-          </svg>
-          <span class="btn-label">Copy</span>
-        </button>
-      </div>
-      <div class="metric-label">Use this in JanitorAI "Model name"</div>
-    </div>
-
-    <div class="parameter-card">
-      <div class="parameter-header">
-        <span class="parameter-name">Cloudflare Endpoint</span>
-      </div>
-      <div class="input-group">
-        <input 
-          type="text" 
-          class="copy-input" 
-          class:glow-highlight={uiStore.cloudflareUrl}
-          value={uiStore.cloudflareUrl || 'Not available'} 
-          readonly 
-          aria-label="Cloudflare Endpoint" 
-        />
-        <button 
-          class="toolbar-btn toolbar-btn--accent" 
-          onclick={() => copyText(uiStore.cloudflareUrl)}
-          disabled={!uiStore.cloudflareUrl}
-          aria-label="Copy Cloudflare Endpoint"
-        >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <rect x="2" y="2" width="13" height="13" rx="2"/>
-          </svg>
-          <span class="btn-label">Copy</span>
-        </button>
-      </div>
-      <div class="metric-label">Public URL via cloudflared</div>
-    </div>
-
-    <div class="parameter-card">
-      <div class="parameter-header">
-        <span class="parameter-name">Local Endpoint</span>
-      </div>
-      <div class="input-group">
-        <input 
-          type="text" 
-          class="copy-input" 
-          value={uiStore.localUrl} 
-          readonly 
-          aria-label="Local Endpoint" 
-        />
-        <button 
-          class="toolbar-btn toolbar-btn--accent" 
-          onclick={() => copyText(uiStore.localUrl)}
-          aria-label="Copy Local Endpoint"
-        >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <rect x="9" y="9" width="13" height="13" rx="2"/>
-            <rect x="2" y="2" width="13" height="13" rx="2"/>
-          </svg>
-          <span class="btn-label">Copy</span>
-        </button>
-      </div>
-      <div class="metric-label">Direct URL (this machine)</div>
-    </div>
-  </div>
-
-  <ol class="setup-steps">
-    <li>Open your character chat in JanitorAI.</li>
-    <li>Turn on Using proxy and create a new proxy profile.</li>
-    <li>Model name: <code>mistralai/devstral-2512:free</code>.</li>
-    <li>Proxy URL: paste the Cloudflare endpoint shown above.</li>
-    <li>
-      API Key: paste your OpenRouter
-      <span class="inline-help-anchor">
-        key
-        <button 
-          type="button" 
-          class="help-badge" 
-          onclick={() => helpVisible = !helpVisible}
-          aria-expanded={helpVisible}
-          aria-controls="openrouterApiHelp" 
-          title="How to get API key"
-        >?</button>
-      </span>.
-      {#if helpVisible}
-        <div id="openrouterApiHelp" class="help-pop">
-          Log in at
-          <a href="https://openrouter.ai" target="_blank" rel="noreferrer noopener">openrouter.ai</a>,
-          open <strong>Keys</strong> from your profile menu, click <strong>Create API Key</strong>, then copy it.
+<div class="setup-page">
+  <Section id="endpoints" title="Endpoints">
+    <div class="config-grid">
+      <div class="config-card">
+        <div class="config-header">
+          <span class="config-label">Model Name</span>
+          <span class="config-hint">For JanitorAI</span>
         </div>
-      {/if}
-    </li>
-    <li>Save changes and Save Settings in JanitorAI, then refresh this page.</li>
-    <li>Send a quick test message (e.g., Hi) to verify the connection.</li>
-  </ol>
-</Section>
+        <div class="config-row">
+          <input 
+            type="text" 
+            class="input input-mono" 
+            value="mistralai/devstral-2512:free" 
+            readonly 
+            aria-label="Model Name Preset" 
+          />
+          <button 
+            class="btn btn-accent" 
+            onclick={() => copyText('mistralai/devstral-2512:free')}
+            aria-label="Copy model name"
+          >
+            <Icon name="copy" size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div class="config-card" class:highlight={uiStore.cloudflareUrl}>
+        <div class="config-header">
+          <span class="config-label">Cloudflare Endpoint</span>
+          <span class="config-hint">Public URL</span>
+        </div>
+        <div class="config-row">
+          <input 
+            type="text" 
+            class="input input-mono" 
+            value={uiStore.cloudflareUrl || 'Not available'} 
+            readonly 
+            aria-label="Cloudflare Endpoint" 
+          />
+          <button 
+            class="btn btn-accent" 
+            onclick={() => copyText(uiStore.cloudflareUrl)}
+            disabled={!uiStore.cloudflareUrl}
+            aria-label="Copy Cloudflare Endpoint"
+          >
+            <Icon name="copy" size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div class="config-card">
+        <div class="config-header">
+          <span class="config-label">Local Endpoint</span>
+          <span class="config-hint">This machine only</span>
+        </div>
+        <div class="config-row">
+          <input 
+            type="text" 
+            class="input input-mono" 
+            value={uiStore.localUrl} 
+            readonly 
+            aria-label="Local Endpoint" 
+          />
+          <button 
+            class="btn btn-accent" 
+            onclick={() => copyText(uiStore.localUrl)}
+            aria-label="Copy Local Endpoint"
+          >
+            <Icon name="copy" size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  </Section>
+
+  <Section id="quickstart" title="Quick Start">
+    <ol class="steps">
+      <li>
+        <span class="step-number">1</span>
+        <div class="step-content">
+          <p>Open your character chat in JanitorAI.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-number">2</span>
+        <div class="step-content">
+          <p>Turn on <strong>Using proxy</strong> and create a new proxy profile.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-number">3</span>
+        <div class="step-content">
+          <p>Set <strong>Model name</strong> to: <code>mistralai/devstral-2512:free</code></p>
+        </div>
+      </li>
+      <li>
+        <span class="step-number">4</span>
+        <div class="step-content">
+          <p>Set <strong>Proxy URL</strong> to the Cloudflare endpoint shown above.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-number">5</span>
+        <div class="step-content">
+          <p>
+            Set <strong>API Key</strong> to your OpenRouter key.
+            <button 
+              type="button" 
+              class="help-trigger" 
+              onclick={() => helpVisible = !helpVisible}
+              aria-expanded={helpVisible}
+              aria-controls="openrouterApiHelp" 
+            >
+              <Icon name="info" size={12} />
+              How to get one?
+            </button>
+          </p>
+          {#if helpVisible}
+            <div id="openrouterApiHelp" class="help-card">
+              <p>
+                Log in at <a href="https://openrouter.ai" target="_blank" rel="noreferrer noopener">openrouter.ai</a>, 
+                open <strong>Keys</strong> from your profile menu, click <strong>Create API Key</strong>, then copy it.
+              </p>
+            </div>
+          {/if}
+        </div>
+      </li>
+      <li>
+        <span class="step-number">6</span>
+        <div class="step-content">
+          <p>Save changes and <strong>Save Settings</strong> in JanitorAI, then refresh this page.</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-number">7</span>
+        <div class="step-content">
+          <p>Send a quick test message (e.g., "Hi") to verify the connection.</p>
+        </div>
+      </li>
+    </ol>
+  </Section>
+</div>
 
 <style>
-  .copy-input.glow-highlight {
-    border-color: var(--border-interactive);
+  .setup-page {
+    animation: fadeInUp var(--duration-normal) var(--ease-out);
   }
 
-  .setup-steps {
-    margin: var(--space-lg) 0;
-    padding-left: var(--space-md);
-    color: var(--text-secondary);
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .config-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg) var(--space-xl);
+    transition: border-color var(--duration-fast);
+  }
+
+  .config-card.highlight {
+    border-color: var(--accent-border);
+  }
+
+  .config-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+  }
+
+  .config-label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .config-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .config-row {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .config-row .input {
+    flex: 1;
+  }
+
+  /* Steps list */
+  .steps {
     list-style: none;
     counter-reset: step-counter;
   }
 
-  .setup-steps li {
-    margin: var(--space-md) 0;
-    position: relative;
-    padding-left: calc(var(--space-lg) + 12px);
-    counter-increment: step-counter;
-    line-height: 1.55;
+  .steps li {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-subtle);
   }
 
-  .setup-steps li::before {
-    content: counter(step-counter);
-    position: absolute;
-    left: 0;
-    top: 0.05rem;
-    width: 22px;
-    height: 22px;
-    border-radius: var(--radius-full);
+  .steps li:last-child {
+    border-bottom: none;
+  }
+
+  .step-number {
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-secondary);
-    font-weight: 600;
+    border-radius: var(--radius-full);
+    background: var(--bg-hover);
+    color: var(--text-muted);
     font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
   }
 
-  .setup-steps code {
-    background: rgba(0, 212, 255, 0.1);
-    padding: 0.1em 0.4em;
+  .step-content {
+    flex: 1;
+    padding-top: 2px;
+  }
+
+  .step-content p {
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .step-content strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .step-content code {
+    display: inline-block;
+    background: var(--accent-subtle);
+    padding: 2px 6px;
     border-radius: var(--radius-sm);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.875em;
-    color: var(--accent-primary);
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    color: var(--accent);
   }
 
-  .setup-steps a {
-    color: var(--accent-primary);
+  .step-content a {
+    color: var(--accent);
     text-decoration: none;
     font-weight: 500;
   }
 
-  .setup-steps a:hover {
-    color: var(--accent-primary-bright);
+  .step-content a:hover {
     text-decoration: underline;
   }
 
-  .inline-help-anchor {
-    position: relative;
-    display: inline-block;
-  }
-
-  .help-badge {
-    position: absolute;
-    top: -0.9em;
-    right: -1.1em;
-    width: 1.35em;
-    height: 1.35em;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
-    line-height: 1.35em;
+  .help-trigger {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: 0.85em;
+    gap: 4px;
+    margin-left: var(--space-xs);
+    padding: 3px 8px;
+    border: none;
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: border-color 0.15s, background-color 0.15s;
-    z-index: 2;
+    transition: color var(--duration-fast), background-color var(--duration-fast);
   }
 
-  .help-badge:hover {
-    border-color: var(--border-interactive);
-    background: rgba(255, 255, 255, 0.06);
+  .help-trigger:hover {
+    color: var(--text-primary);
+    background: var(--bg-active);
   }
 
-  .help-pop {
+  .help-card {
     margin-top: var(--space-sm);
-    color: var(--text-tertiary);
     padding: var(--space-sm) var(--space-md);
+    background: var(--bg-elevated);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.02);
-    animation: fadeIn 0.15s var(--ease-smooth);
+    animation: fadeInUp var(--duration-fast) var(--ease-out);
+  }
+
+  .help-card p {
+    font-size: 0.8125rem;
+  }
+
+  @media (max-width: 640px) {
+    .config-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

@@ -18,40 +18,71 @@
   class="tag-chip"
   class:include={state === 'include'}
   class:exclude={state === 'exclude'}
-  title="Click to toggle: Include ↔ Exclude"
+  title="Click to toggle: Include → Exclude → Neutral"
   {onclick}
   {onmouseenter}
   {onmouseleave}
 >
-  {displayName}
+  <span class="tag-indicator"></span>
+  <span class="tag-name">{displayName}</span>
 </button>
 
 <style>
   .tag-chip {
-    padding: var(--space-xs) var(--space-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
     border-radius: var(--radius-full);
     border: 1px solid var(--border-default);
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-elevated);
     cursor: pointer;
     color: var(--text-secondary);
-    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    transition: 
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
 
   .tag-chip:hover {
-    border-color: var(--border-interactive);
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+  }
+
+  .tag-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: background-color var(--duration-fast);
   }
 
   .tag-chip.include {
-    border-color: var(--accent-primary);
-    background: rgba(0, 212, 255, 0.1);
-    color: var(--accent-primary);
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--accent);
+  }
+
+  .tag-chip.include .tag-indicator {
+    background: var(--accent);
   }
 
   .tag-chip.exclude {
-    border-color: var(--accent-danger);
-    background: rgba(255, 51, 102, 0.1);
-    color: var(--accent-danger);
+    border-color: var(--danger-border);
+    background: var(--danger-subtle);
+    color: var(--danger);
+  }
+
+  .tag-chip.exclude .tag-indicator {
+    background: var(--danger);
+  }
+
+  .tag-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

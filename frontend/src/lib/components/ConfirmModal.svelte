@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from './Icon.svelte';
+
   interface Props {
     open: boolean;
     title?: string;
@@ -35,43 +37,43 @@
     <div class="modal-backdrop" onclick={onCancel} aria-hidden="true"></div>
     <div class="modal-panel modal-panel--sm">
       <div class="modal-header">
-        <div class="modal-title" id="confirmTitle">{title}</div>
-        <div class="modal-actions action-bar">
-          <button class="toolbar-btn" onclick={onCancel} aria-label="Cancel">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">{cancelText}</span>
-          </button>
-          <button 
-            class="toolbar-btn" 
-            class:toolbar-btn--danger={danger}
-            class:toolbar-btn--accent={!danger}
-            onclick={onConfirm} 
-            aria-label="Confirm"
-          >
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              {#if danger}
-                <path d="M3 6h18" stroke-linecap="round"/>
-                <path d="M10 11v6M14 11v6"/>
-              {:else}
-                <path d="M9 11l4 4 8-8" stroke-linecap="round" stroke-linejoin="round"/>
-              {/if}
-            </svg>
-            <span class="btn-label">{confirmText}</span>
-          </button>
-        </div>
+        <h2 class="modal-title" id="confirmTitle">{title}</h2>
       </div>
       <div class="modal-body">
-        {message}
+        <p class="confirm-message">{message}</p>
+        <div class="confirm-actions">
+          <button class="btn" onclick={onCancel}>
+            {cancelText}
+          </button>
+          <button 
+            class="btn"
+            class:btn-danger={danger}
+            class:btn-primary={!danger}
+            onclick={onConfirm}
+          >
+            {#if danger}
+              <Icon name="trash" size={14} />
+            {:else}
+              <Icon name="check" size={14} />
+            {/if}
+            {confirmText}
+          </button>
+        </div>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  /* Uses shared modal styles from app.css */
-  .modal-panel--sm {
-    width: min(500px, 90vw);
+  .confirm-message {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: var(--space-lg);
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
   }
 </style>

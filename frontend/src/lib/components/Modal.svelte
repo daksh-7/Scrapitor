@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { uiStore } from '$lib/stores';
+  import Icon from './Icon.svelte';
 
   interface Props {
     open: boolean;
@@ -34,32 +35,25 @@
     <button class="modal-backdrop" onclick={onClose} aria-label="Close modal"></button>
     <div class="modal-panel">
       <div class="modal-header">
-        <div class="modal-title" id="modalTitle">{title}</div>
-        <div class="modal-actions action-bar">
+        <div class="modal-title-group">
           {#if onBack}
-            <button class="toolbar-btn" onclick={onBack} aria-label="Back">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span class="btn-label">Back</span>
+            <button class="btn btn-ghost btn-icon" onclick={onBack} aria-label="Go back">
+              <Icon name="back" size={14} />
             </button>
           {/if}
+          <h2 class="modal-title mono" id="modalTitle">{title}</h2>
+        </div>
+        <div class="modal-actions action-bar">
           {#if actions}
             {@render actions()}
           {:else}
-            <button class="toolbar-btn" onclick={handleCopy} aria-label="Copy content">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <rect x="2" y="2" width="13" height="13" rx="2"/>
-              </svg>
-              <span class="btn-label">Copy</span>
+            <button class="btn" onclick={handleCopy} aria-label="Copy content">
+              <Icon name="copy" size={14} />
+              <span>Copy</span>
             </button>
           {/if}
-          <button class="toolbar-btn toolbar-btn--danger" onclick={onClose} aria-label="Close modal">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-            </svg>
-            <span class="btn-label">Close</span>
+          <button class="btn btn-ghost" onclick={onClose} aria-label="Close modal">
+            <Icon name="close" size={14} />
           </button>
         </div>
       </div>
@@ -71,8 +65,19 @@
 {/if}
 
 <style>
-  /* Uses shared modal styles from app.css */
+  .modal-title-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+  }
+
   .modal-title {
-    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

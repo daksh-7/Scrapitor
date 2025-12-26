@@ -1,5 +1,6 @@
 <script lang="ts">
   import { logsStore } from '$lib/stores';
+  import Icon from './Icon.svelte';
 
   interface Props {
     name: string;
@@ -32,33 +33,45 @@
 <div 
   class="log-item"
   class:selectable
-  class:active={selected}
+  class:selected
   data-name={name}
   {onclick}
   role="button"
   tabindex="0"
   onkeydown={(e) => e.key === 'Enter' && onclick()}
 >
-  <div class="log-left">
+  <div class="log-main">
+    {#if selectable}
+      <div class="checkbox" class:checked={selected}>
+        {#if selected}
+          <Icon name="check" size={12} />
+        {/if}
+      </div>
+    {/if}
     <span class="log-filename">{name}</span>
+  </div>
+  
+  <div class="log-actions">
     {#if onOpenParsed && !selectable}
       <button 
-        class="mini-btn mini-txt-btn loud" 
+        class="action-chip" 
         onclick={(e) => { e.stopPropagation(); onOpenParsed?.(); }}
+        title="View parsed TXT versions"
       >
         TXT
       </button>
     {/if}
     {#if onRename && !selectable}
       <button 
-        class="icon-btn mini-rename-btn" 
+        class="action-btn" 
         onclick={(e) => { e.stopPropagation(); onRename?.(); }}
+        title="Rename"
       >
-        ✎
+        <Icon name="edit" size={12} />
       </button>
     {/if}
+    <span class="log-time">{formatTime(meta?.mtime)}</span>
   </div>
-  <span class="log-time">{formatTime(meta?.mtime)}</span>
 </div>
 
 <style>
@@ -66,97 +79,134 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-md);
-    margin-bottom: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: 2px;
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.01);
-    border: 1px solid var(--border-subtle);
+    background: transparent;
+    border: 1px solid transparent;
     cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s;
+    transition: 
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+    gap: var(--space-md);
   }
 
   .log-item:hover {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: var(--border-interactive);
+    background: var(--bg-hover);
   }
 
   .log-item.selectable {
     cursor: pointer;
   }
 
-  .log-item.selectable.active {
-    border-color: var(--accent-primary);
-    background: rgba(0, 212, 255, 0.08);
+  .log-item.selected {
+    background: var(--accent-subtle);
+    border-color: var(--accent-border);
   }
 
-  .log-left {
-    display: inline-flex;
+  .log-main {
+    display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-sm);
+    min-width: 0;
+    flex: 1;
+  }
+
+  .checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: 
+      background-color var(--duration-fast),
+      border-color var(--duration-fast);
+  }
+
+  .checkbox.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-base);
   }
 
   .log-filename {
     font-weight: 500;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.875rem;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .log-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
   }
 
   .log-time {
     font-size: 0.75rem;
+    color: var(--text-faint);
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .action-chip {
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--accent);
+    cursor: pointer;
+    opacity: 0;
+    transition: 
+      opacity var(--duration-fast),
+      background-color var(--duration-fast);
+  }
+
+  .log-item:hover .action-chip {
+    opacity: 1;
+  }
+
+  .action-chip:hover {
+    background: var(--accent);
+    color: var(--bg-base);
+  }
+
+  .action-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
     color: var(--text-muted);
-  }
-
-  .mini-btn {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: border-color 0.15s;
-  }
-
-  .mini-btn:hover {
-    border-color: var(--border-interactive);
-  }
-
-  .mini-txt-btn {
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: 
+      opacity var(--duration-fast),
+      color var(--duration-fast),
+      background-color var(--duration-fast);
   }
 
-  .log-item:hover .mini-txt-btn {
+  .log-item:hover .action-btn {
     opacity: 1;
   }
 
-  .mini-btn.loud {
-    background: linear-gradient(135deg, var(--accent-secondary) 0%, var(--accent-secondary) 100%);
-    color: #000;
-    border-color: rgba(0, 255, 136, 0.6);
-  }
-
-  .mini-btn.loud:hover {
-    filter: brightness(1.1);
-  }
-
-  .icon-btn {
-    border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
+  .action-btn:hover {
     color: var(--text-primary);
-    border-radius: var(--radius-full);
-    padding: 4px 8px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s, border-color 0.15s;
-  }
-
-  .log-item:hover .icon-btn {
-    opacity: 1;
-  }
-
-  .icon-btn:hover {
-    border-color: var(--border-interactive);
+    background: var(--bg-active);
   }
 </style>

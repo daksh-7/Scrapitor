@@ -1,12 +1,15 @@
 <script lang="ts">
   import { uiStore } from '$lib/stores';
+  import Icon from './Icon.svelte';
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: 'home' },
-    { id: 'setup', label: 'Setup', icon: 'settings' },
-    { id: 'parser', label: 'Parser', icon: 'list' },
-    { id: 'activity', label: 'Activity', icon: 'clock' },
+    { id: 'overview', label: 'Overview', icon: 'home' as const },
+    { id: 'setup', label: 'Setup', icon: 'settings' as const },
+    { id: 'parser', label: 'Parser', icon: 'layers' as const },
+    { id: 'activity', label: 'Activity', icon: 'activity' as const },
   ];
+
+  let collapsed = $state(false);
 
   function navigateTo(id: string) {
     uiStore.setActiveSection(id);
@@ -21,17 +24,41 @@
   function openLocal() {
     window.open(uiStore.localUrl.replace('/openrouter-cc', '/'), '_blank');
   }
+
+  function toggleCollapse() {
+    collapsed = !collapsed;
+  }
 </script>
 
-<aside class="sidebar" aria-label="Sidebar">
-  <div class="brand" aria-label="Scrapitor - Local OpenRouter Gateway">
-    <div class="logo-icon" aria-hidden="true">
-      <img class="logo-img" src="/assets/logo.png" alt="Scrapitor logo" />
+<aside class="sidebar" class:collapsed aria-label="Main navigation">
+  <div class="sidebar-header">
+    <div class="brand" aria-label="Scrapitor - Local OpenRouter Gateway">
+      <div class="logo">
+        <img src="/assets/logo.png" alt="" class="logo-img" />
+      </div>
+      {#if !collapsed}
+        <div class="brand-text">
+          <span class="brand-name">Scrapitor</span>
+          <span class="status-indicator" title="Server running">
+            <span class="status-dot"></span>
+          </span>
+        </div>
+      {/if}
     </div>
-    <div class="brand-meta">
-      <div class="brand-title">Scrapitor</div>
-      <div class="brand-sub">Local OpenRouter Gateway</div>
-    </div>
+    <button 
+      class="collapse-btn" 
+      onclick={toggleCollapse}
+      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      title={collapsed ? 'Expand' : 'Collapse'}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        {#if collapsed}
+          <path d="M9 18l6-6-6-6"/>
+        {:else}
+          <path d="M15 18l-6-6 6-6"/>
+        {/if}
+      </svg>
+    </button>
   </div>
 
   <nav class="nav" role="navigation" aria-label="Primary">
@@ -41,224 +68,301 @@
         class:active={uiStore.activeSection === item.id}
         onclick={() => navigateTo(item.id)}
         aria-current={uiStore.activeSection === item.id ? 'page' : undefined}
+        title={collapsed ? item.label : undefined}
       >
-        {#if item.icon === 'home'}
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" aria-hidden="true">
-            <path d="M3 12l9-9 9 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 21V9h6v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        {:else if item.icon === 'settings'}
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" aria-hidden="true">
-            <path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" stroke-width="2"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.65 1.65 0 0015 19.4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        {:else if item.icon === 'list'}
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" aria-hidden="true">
-            <path d="M4 6h16M4 12h16M4 18h7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        {:else if item.icon === 'clock'}
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" stroke-width="2"/>
-            <path d="M12 6v6l4 2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+        <Icon name={item.icon} size={18} />
+        {#if !collapsed}
+          <span class="nav-label">{item.label}</span>
         {/if}
-        <span>{item.label}</span>
       </button>
     {/each}
   </nav>
 
   <div class="sidebar-footer">
-    <button 
-      class="ghost-button" 
-      onclick={openCloudflare}
-      disabled={!uiStore.cloudflareUrl}
-      aria-label="Open Cloudflare URL"
-    >
-      Open Cloudflare
-    </button>
-    <button class="ghost-button" onclick={openLocal} aria-label="Open Local URL">
-      Open Local
-    </button>
-    <div class="status-badge status-centered" role="status" aria-live="polite">
-      <div class="status-dot" aria-hidden="true"></div>
-      <span>Server Active</span>
-      <div class="status-dot" aria-hidden="true"></div>
-    </div>
+    {#if !collapsed}
+      <div class="quick-links">
+        <button 
+          class="link-btn" 
+          onclick={openCloudflare}
+          disabled={!uiStore.cloudflareUrl}
+          title={uiStore.cloudflareUrl || 'Not available'}
+        >
+          <Icon name="externalLink" size={14} />
+          <span>Cloudflare</span>
+        </button>
+        <button 
+          class="link-btn" 
+          onclick={openLocal}
+          title={uiStore.localUrl}
+        >
+          <Icon name="externalLink" size={14} />
+          <span>Local</span>
+        </button>
+      </div>
+    {:else}
+      <div class="quick-links-collapsed">
+        <button 
+          class="link-btn-icon" 
+          onclick={openCloudflare}
+          disabled={!uiStore.cloudflareUrl}
+          title="Open Cloudflare URL"
+        >
+          <Icon name="externalLink" size={16} />
+        </button>
+      </div>
+    {/if}
   </div>
 </aside>
 
 <style>
   .sidebar {
-    width: 260px;
-    flex: 0 0 260px;
-    background: var(--bg-secondary);
+    width: 240px;
+    flex: 0 0 240px;
+    background: var(--bg-surface);
     border-right: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    padding: var(--space-lg);
     position: sticky;
     top: 0;
     height: 100vh;
     overflow-y: auto;
+    transition: width var(--duration-normal) var(--ease-out),
+                flex-basis var(--duration-normal) var(--ease-out);
+  }
+
+  .sidebar.collapsed {
+    width: 64px;
+    flex: 0 0 64px;
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .brand {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    margin-bottom: var(--space-xl);
-    position: relative;
+    gap: var(--space-sm);
+    min-width: 0;
   }
 
-  .logo-icon {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    background: var(--surface-primary);
-    border-radius: var(--radius-lg);
+  .logo {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    border: 1px solid var(--border-subtle);
     overflow: hidden;
+    border: 1px solid var(--border-subtle);
   }
 
-  .logo-icon .logo-img {
+  .logo-img {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    display: block;
   }
 
-  .brand-meta {
+  .brand-text {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+  }
+
+  .brand-name {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+  }
+
+  .collapse-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: color var(--duration-fast), background-color var(--duration-fast);
+  }
+
+  .collapse-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .collapsed .collapse-btn {
+    display: none;
+  }
+
+  .nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-sm);
+    overflow-y: auto;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: 
+      color var(--duration-fast),
+      background-color var(--duration-fast);
+    text-align: left;
+    width: 100%;
+    white-space: nowrap;
+  }
+
+  .collapsed .nav-item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+
+  .nav-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .nav-item.active {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .nav-item.active:hover {
+    background: var(--accent-subtle);
+  }
+
+  .nav-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-footer {
+    padding: var(--space-sm);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .quick-links {
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
 
-  .brand-title {
-    font-size: 1.125rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-  }
-
-  .brand-sub {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  .nav {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    flex: 1;
-  }
-
-  .nav-item {
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    color: var(--text-tertiary);
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.9375rem;
-    border: 1px solid transparent;
-    background: transparent;
-    position: relative;
-    overflow: hidden;
-    transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+  .link-btn {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast), background-color var(--duration-fast);
     text-align: left;
     width: 100%;
   }
 
-  .nav-item:hover {
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.03);
-    border-color: var(--border-default);
-  }
-
-  .nav-item.active {
-    color: var(--bg-primary);
-    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-    font-weight: 600;
-  }
-
-  .sidebar-footer {
-    margin-top: auto;
-    padding-top: var(--space-lg);
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .ghost-button {
-    display: block;
-    text-align: center;
-    padding: var(--space-sm) var(--space-md);
-    margin-bottom: var(--space-sm);
-    border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border-default);
+  .link-btn:hover:not(:disabled) {
     color: var(--text-secondary);
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.875rem;
-    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-    cursor: pointer;
-    width: 100%;
+    background: var(--bg-hover);
   }
 
-  .ghost-button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: var(--border-interactive);
-    color: var(--text-primary);
-  }
-
-  .ghost-button:disabled {
-    opacity: 0.5;
+  .link-btn:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
   }
 
-  .status-badge {
+  .quick-links-collapsed {
+    display: flex;
+    justify-content: center;
+  }
+
+  .link-btn-icon {
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    background: rgba(0, 255, 136, 0.08);
-    border: 1px solid rgba(0, 255, 136, 0.25);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-full);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--accent-success);
-    margin-top: 0.75rem;
-  }
-
-  .status-centered {
     justify-content: center;
-    gap: clamp(1rem, 8vw, 2.25rem);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: color var(--duration-fast), background-color var(--duration-fast);
   }
 
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    background: var(--accent-success);
-    border-radius: 50%;
+  .link-btn-icon:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .link-btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   @media (max-width: 768px) {
     .sidebar {
       width: 100%;
+      flex: 0 0 auto;
       height: auto;
       position: relative;
       border-right: none;
       border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .sidebar.collapsed {
+      width: 100%;
+      flex: 0 0 auto;
+    }
+
+    .nav {
+      flex-direction: row;
+      overflow-x: auto;
+      flex: 0 0 auto;
+    }
+
+    .nav-item {
+      flex: 0 0 auto;
+    }
+
+    .sidebar-footer {
+      display: none;
+    }
+
+    .collapse-btn {
+      display: none;
     }
   }
 </style>

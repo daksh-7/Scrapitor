@@ -3,6 +3,7 @@
   import LogItem from '$lib/components/LogItem.svelte';
   import Modal from '$lib/components/Modal.svelte';
   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import Icon from '$lib/components/Icon.svelte';
   import { logsStore, parserStore, uiStore } from '$lib/stores';
 
   let filterText = $state('');
@@ -17,7 +18,6 @@
   let confirmMessage = $state('');
   let confirmAction = $state<() => void>(() => {});
 
-  // Memoize the lowercase search term (no debounce needed with derived)
   const filterLower = $derived(filterText.toLowerCase());
 
   const filteredLogs = $derived(
@@ -120,87 +120,82 @@
   }
 </script>
 
-<Section id="activity" title="Activity">
-  <div class="input-group" style="margin-bottom: 0.8rem;">
-    <input 
-      class="copy-input" 
-      placeholder="Filter logs by name…" 
-      aria-label="Filter logs by name"
-      bind:value={filterText}
-    />
-    <button class="button button-secondary" onclick={() => logsStore.refresh()}>Refresh</button>
-  </div>
-
-  <div class="action-bar" style="margin-bottom: 0.4rem; justify-content: flex-end;">
-    {#if !logsStore.selectingLogs}
-      <button class="toolbar-btn toolbar-btn--danger" onclick={startDeleteSelection}>
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18" stroke-linecap="round"/>
-          <path d="M10 11v6M14 11v6"/>
-        </svg>
-        <span class="btn-label">Delete…</span>
-      </button>
-    {/if}
-  </div>
-
-  {#if logsStore.selectingLogs}
-    <div class="action-bar" style="margin-bottom: 0.8rem;">
-      <button class="toolbar-btn" onclick={() => logsStore.toggleSelectAll()}>
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="3" y="3" width="18" height="18" rx="4"/>
-        </svg>
-        <span class="btn-label">
-          {visibleLogs.every(n => logsStore.selectedLogs.has(n)) ? 'Deselect All' : 'Select All'}
-        </span>
-      </button>
-      {#if logsStore.selectionAction === 'write'}
-        <button class="toolbar-btn toolbar-btn--accent" onclick={rewriteSelected}>
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 17l6 3 10-6-6-3-10 6z"/>
-          </svg>
-          <span class="btn-label">Write Selected</span>
-        </button>
-      {:else}
-        <button class="toolbar-btn toolbar-btn--danger" onclick={deleteSelected}>
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18" stroke-linecap="round"/>
-            <path d="M10 11v6M14 11v6"/>
-          </svg>
-          <span class="btn-label">Delete Selected</span>
-        </button>
-      {/if}
-      <button class="toolbar-btn" onclick={cancelSelection}>
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/>
-        </svg>
-        <span class="btn-label">Cancel</span>
-      </button>
-    </div>
-  {/if}
-
-  <div class="logs-container">
-    {#if visibleLogs.length === 0}
-      <div class="empty-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 6v6l4 2"/>
-        </svg>
-        <p>Waiting for requests...</p>
-      </div>
-    {:else}
-      {#each visibleLogs as name (name)}
-        <LogItem 
-          {name}
-          selectable={logsStore.selectingLogs}
-          selected={logsStore.selectedLogs.has(name)}
-          onclick={() => logsStore.selectingLogs ? logsStore.toggleSelection(name) : openLog(name)}
-          onOpenParsed={() => openParsedList(name)}
+<div class="activity-page">
+  <Section id="logs">
+    <div class="logs-header">
+      <div class="input-group">
+        <input 
+          class="input" 
+          placeholder="Filter logs..." 
+          aria-label="Filter logs by name"
+          bind:value={filterText}
         />
-      {/each}
-    {/if}
-  </div>
-</Section>
+        <button class="btn" onclick={() => logsStore.refresh()}>
+          <Icon name="refresh" size={14} />
+          Refresh
+        </button>
+      </div>
+      
+      <div class="logs-actions">
+        {#if logsStore.selectingLogs}
+          <div class="selection-bar">
+            <span class="selection-count">
+              {logsStore.selectedCount} selected
+            </span>
+            <button class="btn btn-sm" onclick={() => logsStore.toggleSelectAll()}>
+              <Icon name="checkSquare" size={12} />
+              {visibleLogs.every(n => logsStore.selectedLogs.has(n)) ? 'Deselect All' : 'Select All'}
+            </button>
+            {#if logsStore.selectionAction === 'write'}
+              <button class="btn btn-sm btn-accent" onclick={rewriteSelected}>
+                <Icon name="write" size={12} />
+                Write Selected
+              </button>
+            {:else}
+              <button class="btn btn-sm btn-danger" onclick={deleteSelected}>
+                <Icon name="trash" size={12} />
+                Delete Selected
+              </button>
+            {/if}
+            <button class="btn btn-sm" onclick={cancelSelection}>
+              Cancel
+            </button>
+          </div>
+        {:else}
+          <button class="btn btn-danger" onclick={startDeleteSelection}>
+            <Icon name="trash" size={14} />
+            Delete...
+          </button>
+        {/if}
+      </div>
+    </div>
+
+    <div class="logs-container">
+      {#if visibleLogs.length === 0}
+        <div class="empty-state">
+          <Icon name="clock" size={48} class="empty-icon" />
+          <p class="empty-title">No logs yet</p>
+          <p class="empty-description">Logs will appear here when you send requests through the proxy.</p>
+        </div>
+      {:else}
+        {#each visibleLogs as name (name)}
+          <LogItem 
+            {name}
+            selectable={logsStore.selectingLogs}
+            selected={logsStore.selectedLogs.has(name)}
+            onclick={() => logsStore.selectingLogs ? logsStore.toggleSelection(name) : openLog(name)}
+            onOpenParsed={() => openParsedList(name)}
+          />
+        {/each}
+        {#if filteredLogs.length > 100}
+          <div class="truncation-notice">
+            Showing first 100 of {filteredLogs.length} logs
+          </div>
+        {/if}
+      {/if}
+    </div>
+  </Section>
+</div>
 
 <!-- Log Content Modal -->
 <Modal 
@@ -222,20 +217,18 @@
 >
   {#snippet children()}
     <div class="version-picker">
-      <div class="version-header">Parsed TXT Versions</div>
-      <ul class="version-list">
+      <p class="version-header">Select a version to view:</p>
+      <div class="version-list">
         {#each parsedVersions as version}
-          <li>
-            <button 
-              class="version-item" 
-              onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
-            >
-              {version.file}
-            </button>
-            <span class="meta">{formatDate(version.mtime)} • {formatSize(version.size)}</span>
-          </li>
+          <button 
+            class="version-item" 
+            onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
+          >
+            <span class="version-name mono">{version.file}</span>
+            <span class="version-meta">{formatDate(version.mtime)} · {formatSize(version.size)}</span>
+          </button>
         {/each}
-      </ul>
+      </div>
     </div>
   {/snippet}
 </Modal>
@@ -253,12 +246,48 @@
 />
 
 <style>
+  .activity-page {
+    animation: fadeInUp var(--duration-normal) var(--ease-out);
+  }
+
+  .logs-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .logs-header .input-group {
+    max-width: 400px;
+  }
+
+  .logs-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .selection-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .selection-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 4px 8px;
+    background: var(--accent-subtle);
+    border-radius: var(--radius-sm);
+  }
+
   .logs-container {
-    background: var(--surface-secondary);
+    background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: var(--space-md);
-    height: min(60vh, 600px);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm);
+    max-height: min(60vh, 600px);
     overflow-y: auto;
   }
 
@@ -268,59 +297,95 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-3xl) var(--space-xl);
-    color: var(--text-muted);
     text-align: center;
   }
 
-  .empty-state svg {
-    width: 64px;
-    height: 64px;
+  .empty-state :global(.empty-icon) {
+    color: var(--text-faint);
     margin-bottom: var(--space-lg);
-    opacity: 0.3;
+    opacity: 0.5;
   }
 
-  /* Version picker styles (used inside Modal) */
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+  }
+
+  .empty-description {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    max-width: 280px;
+  }
+
+  .truncation-notice {
+    text-align: center;
+    padding: var(--space-md);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-subtle);
+    margin-top: var(--space-sm);
+  }
+
+  /* Version picker */
   .version-picker {
     white-space: normal;
     word-break: normal;
   }
 
   .version-header {
-    font-weight: 700;
-    color: var(--text-primary);
+    font-weight: 500;
+    color: var(--text-secondary);
     margin-bottom: var(--space-md);
   }
 
   .version-list {
-    list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-  }
-
-  .version-list li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    gap: 4px;
   }
 
   .version-item {
-    padding: 6px 10px;
-    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-surface);
     border: 1px solid var(--border-default);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: 
+      border-color var(--duration-fast),
+      background-color var(--duration-fast);
+    text-align: left;
   }
 
   .version-item:hover {
-    border-color: var(--border-interactive);
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
   }
 
-  .version-list .meta {
-    color: var(--text-tertiary);
+  .version-name {
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+  }
+
+  .version-meta {
     font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 640px) {
+    .logs-header .input-group {
+      max-width: none;
+    }
+
+    .selection-bar {
+      width: 100%;
+      justify-content: flex-start;
+    }
   }
 </style>

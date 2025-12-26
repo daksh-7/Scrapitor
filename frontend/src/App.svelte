@@ -72,16 +72,20 @@
   <main class="main">
     <Topbar onRefresh={handleRefresh} />
     
-    <div class="container">
-      {#if uiStore.activeSection === 'overview'}
-        <Overview />
-      {:else if uiStore.activeSection === 'setup'}
-        <Setup />
-      {:else if uiStore.activeSection === 'parser'}
-        <Parser />
-      {:else if uiStore.activeSection === 'activity'}
-        <Activity />
-      {/if}
+    <div class="content">
+      {#key uiStore.activeSection}
+        <div class="page">
+          {#if uiStore.activeSection === 'overview'}
+            <Overview />
+          {:else if uiStore.activeSection === 'setup'}
+            <Setup />
+          {:else if uiStore.activeSection === 'parser'}
+            <Parser />
+          {:else if uiStore.activeSection === 'activity'}
+            <Activity />
+          {/if}
+        </div>
+      {/key}
     </div>
   </main>
 </div>
@@ -92,8 +96,6 @@
   .app-shell {
     display: flex;
     min-height: 100vh;
-    position: relative;
-    z-index: 2;
   }
 
   .main {
@@ -101,12 +103,18 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    position: relative;
+    background: var(--bg-base);
   }
 
-  .container {
-    padding: var(--space-lg);
-    max-width: 100%;
+  .content {
+    flex: 1;
+    padding: var(--space-xl) var(--space-2xl);
+    overflow-y: auto;
+  }
+
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
   }
 
   @media (max-width: 768px) {
@@ -114,8 +122,8 @@
       flex-direction: column;
     }
 
-    .container {
-      padding: var(--space-md);
+    .content {
+      padding: var(--space-lg);
     }
   }
 </style>

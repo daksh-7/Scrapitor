@@ -7,4 +7,5 @@ export { default as TagChip } from './TagChip.svelte';
 export { default as Section } from './Section.svelte';
 export { default as LogItem } from './LogItem.svelte';
 export { default as ConfirmModal } from './ConfirmModal.svelte';
+export { default as Icon } from './Icon.svelte';
 
