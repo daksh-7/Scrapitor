@@ -56,14 +56,15 @@ Scrapitor/
 ├── frontend/                     # Svelte 5 SPA source
 │   ├── src/
 │   │   ├── lib/
-│   │   │   ├── api/              # Typed API client
-│   │   │   ├── components/       # Reusable UI components
-│   │   │   └── stores/           # Svelte 5 runes state
-│   │   ├── routes/               # Page sections
-│   │   ├── App.svelte            # Root component
+│   │   │   ├── api/              # Typed API client (client.ts, types.ts)
+│   │   │   ├── components/       # Reusable UI components (11 components)
+│   │   │   └── stores/           # Svelte 5 runes state (logs, parser, ui)
+│   │   ├── routes/               # Page components (Overview, Parser, Activity)
+│   │   ├── App.svelte            # Root component with layout & routing
 │   │   ├── main.ts               # Entry point
-│   │   └── app.css               # Global styles
-│   ├── public/assets/            # Static assets
+│   │   └── app.css               # Global design system & utilities
+│   ├── public/assets/            # Static assets (logo)
+│   ├── index.html                # SPA entry HTML with Geist font
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
@@ -460,12 +461,12 @@ npm run check
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/lib/api/` | Typed API client (`client.ts`, `types.ts`) |
-| `src/lib/stores/` | Svelte 5 runes state (`logsStore`, `parserStore`, `uiStore`) |
-| `src/lib/components/` | Reusable UI components |
-| `src/routes/` | Page sections (Overview, Setup, Parser, Activity) |
-| `src/App.svelte` | Root component with layout |
-| `src/app.css` | Global CSS variables and base styles |
+| `src/lib/api/` | Typed API client (`client.ts`, `types.ts`, `index.ts`) |
+| `src/lib/stores/` | Svelte 5 runes state: `logsStore` (log data/cache), `parserStore` (tag settings), `uiStore` (endpoints/notifications) |
+| `src/lib/components/` | 11 reusable components: `Icon`, `Modal`, `ConfirmModal`, `Section`, `MetricCard`, `TagChip`, `LogItem`, `Sidebar`, `Topbar`, `Notification` |
+| `src/routes/` | Page components: `Overview` (dashboard/endpoints), `Parser` (tag filtering), `Activity` (log browser) |
+| `src/App.svelte` | Root component with layout, polling, and client-side routing |
+| `src/app.css` | Design system with CSS variables, utility classes, modal styles, and animations |
 
 
 ## Notes

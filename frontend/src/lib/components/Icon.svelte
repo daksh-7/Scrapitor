@@ -7,8 +7,6 @@
 
   export type IconName = 
     | 'home'
-    | 'settings'
-    | 'list'
     | 'clock'
     | 'refresh'
     | 'copy'
@@ -24,7 +22,6 @@
     | 'activity'
     | 'layers'
     | 'server'
-    | 'link'
     | 'externalLink'
     | 'warning'
     | 'info'
@@ -49,11 +46,6 @@
   {#if name === 'home'}
     <path d="M3 12l9-9 9 9"/>
     <path d="M9 21V9h6v12"/>
-  {:else if name === 'settings'}
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-  {:else if name === 'list'}
-    <path d="M4 6h16M4 12h16M4 18h7"/>
   {:else if name === 'clock'}
     <circle cx="12" cy="12" r="10"/>
     <path d="M12 6v6l4 2"/>
@@ -102,9 +94,6 @@
     <rect x="2" y="2" width="20" height="8" rx="2"/>
     <rect x="2" y="14" width="20" height="8" rx="2"/>
     <path d="M6 6h.01M6 18h.01"/>
-  {:else if name === 'link'}
-    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
   {:else if name === 'externalLink'}
     <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
     <polyline points="15 3 21 3 21 9"/>
