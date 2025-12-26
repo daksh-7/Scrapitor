@@ -139,6 +139,12 @@
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  .collapsed .sidebar-header {
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+  }
+
   .brand {
     display: flex;
     align-items: center;
@@ -197,6 +203,18 @@
   .collapse-btn:hover {
     color: var(--text-primary);
     background: var(--bg-hover);
+  }
+
+  .collapsed .collapse-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .collapsed .collapse-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-default);
   }
 
   .nav {
