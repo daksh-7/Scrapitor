@@ -1,18 +1,18 @@
 # scrapitor
 
-Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. Run it via **Docker Compose (recommended)** or via the Windows launcher (`run.bat`).
+Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. Run it via the **Windows launcher (`run.bat`) (recommended)** or via Docker Compose.
 
-If you prefer the shortest path, jump to [Docker (Installation and Usage)](#docker-installation-and-usage) or [Casual Usage](#casual-usage).
+If you prefer the shortest path, jump to [Installation](#installation) or [Casual Usage](#casual-usage).
 
 ## Table of Contents
 
 - [Features](#features)
 - [Directory Structure](#directory-structure)
 - [Installation](#installation)
-- [Docker (Installation and Usage)](#docker-installation-and-usage)
 - [Casual Usage](#casual-usage)
 - [Usage in Janitor](#usage-in-janitor)
 - [How It Works](#how-it-works)
+- [Docker (Alternative)](#docker-alternative)
 - [Installation (Manual)](#installation-manual)
 - [Web Dashboard](#web-dashboard)
 - [Parser (Rules and CLI)](#parser-rules-and-cli)
@@ -102,12 +102,7 @@ winget install git.git
 git clone https://github.com/daksh-7/Scrapitor
 ```
 
-2) Choose a run method:
-
-- **Docker (recommended)**: see [Docker (Installation and Usage)](#docker-installation-and-usage). Requires Docker Desktop only.
-- **Windows launcher (no Docker)**: requires PowerShell 7 + Python. Optionally Node.js 18+ to rebuild the frontend.
-
-Windows prerequisites:
+2) Install prerequisites:
 
 - PowerShell 7 (`pwsh`). Install with:
 
@@ -116,6 +111,7 @@ winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept
 ```
 
 - Python 3.10+ in PATH. Download for Windows: https://www.python.org/downloads/ (During setup, enable "Add python.exe to PATH").
+- Optionally Node.js 18+ to rebuild the frontend.
 
 3) Run the launcher:
 
@@ -131,10 +127,52 @@ The launcher will:
 
 Copy the "JanitorAI API URL" shown in the console or the UI (it ends with `/openrouter-cc`). You will use it in JanitorAI's proxy settings.
 
+**Alternative**: If you prefer Docker, see [Docker (Alternative)](#docker-alternative).
 
-## Docker (Installation and Usage)
 
-Fastest cross-platform path with Docker.
+## Casual Usage
+
+1) Start scrapitor:
+
+- Option A (recommended): Download ZIP from `https://github.com/daksh-7/Scrapitor`, unzip, then run `Scrapitor\run.bat`.
+- Option B (Docker alternative): `docker compose up --build` then open `http://localhost:5000/` (or `http://localhost:<PROXY_PORT>/` if you changed `PROXY_PORT`).
+
+2) In the dashboard "Setup" section, copy the "Cloudflare Endpoint" and the "Model Name Preset".
+3) Follow the steps in [Usage in Janitor](#usage-in-janitor) to wire JanitorAI to your Cloudflare endpoint.
+4) Send a message in JanitorAI; your request appears in "Activity".
+5) Optionally open "Parser", choose Default or Custom, and click "Write" to export a TXT version.
+
+
+## Usage in Janitor
+
+Use these six steps inside JanitorAI's UI (exactly as shown in the app):
+
+- Initiate a chat with the desired character on JanitorAI.
+- Click "using proxy"; under "proxy", add a configuration and name it anything.
+- For model name, paste: `mistralai/devstral-2512:free`
+- Paste the Cloudflare URL (copied above) under "Proxy URL."
+- Enter your OpenRouter API key in the "API Key" section. If you don't have an OpenRouter API Key, follow these steps:
+  - Log in to [openrouter.ai](https://openrouter.ai).
+  - Click your profile picture (top-right) and open "Keys".
+  - Click "Create API Key".
+  - Copy the key.
+- Click "Save changes" then "Save Settings" and refresh the page.
+- Enter any sample message (e.g., "hi"); the app will then receive the model data.
+
+
+## How It Works
+
+- The Flask app exposes `/openrouter-cc` and an alias `/chat/completions`. POST your OpenAI-style chat payload here.
+- Authorization: If you set `OPENROUTER_API_KEY`, the server uses it; otherwise the client's `Authorization` header is forwarded.
+- Logging: Each request payload is saved to `var/logs/<timestamp>.json` (old files are pruned by a rolling limit).
+- Parsing: On each saved log (and on demand), the parser writes a TXT export per character, versioned as `<Character Name>.vN.txt`.
+- Tunnel: `cloudflared` publishes a public URL; the dashboard displays both local and public endpoints.
+- Frontend: A Svelte 5 SPA with TypeScript, compiled to static assets served by Flask. Features reactive state management, component-based architecture, and automatic log prefetching.
+
+
+## Docker (Alternative)
+
+Cross-platform alternative using Docker. Use this if you prefer containerized deployment or are on macOS/Linux.
 
 Prerequisites:
 
@@ -179,46 +217,6 @@ Environment variables (use a `.env` file at the repo root, or set them in your s
 - `OPENROUTER_API_KEY`: optional server-side key (otherwise the client `Authorization` header is forwarded)
 - `ALLOW_SERVER_API_KEY`: set `true` to allow using `OPENROUTER_API_KEY` server-side (default `false`)
 - `CLOUDFLARED_FLAGS`: extra cloudflared flags (default is `--edge-ip-version 4 --loglevel info`)
-
-
-## Casual Usage
-
-1) Start scrapitor:
-
-- Option A (recommended): `docker compose up --build` then open `http://localhost:5000/` (or `http://localhost:<PROXY_PORT>/` if you changed `PROXY_PORT`).
-- Option B (Windows launcher): Download ZIP from `https://github.com/daksh-7/Scrapitor`, unzip, then run `Scrapitor\run.bat`.
-
-2) In the dashboard "Setup" section, copy the "Cloudflare Endpoint" and the "Model Name Preset".
-3) Follow the steps in [Usage in Janitor](#usage-in-janitor) to wire JanitorAI to your Cloudflare endpoint.
-4) Send a message in JanitorAI; your request appears in "Activity".
-5) Optionally open "Parser", choose Default or Custom, and click "Write" to export a TXT version.
-
-
-## Usage in Janitor
-
-Use these six steps inside JanitorAI's UI (exactly as shown in the app):
-
-- Initiate a chat with the desired character on JanitorAI.
-- Click "using proxy"; under "proxy", add a configuration and name it anything.
-- For model name, paste: `mistralai/devstral-2512:free`
-- Paste the Cloudflare URL (copied above) under "Proxy URL."
-- Enter your OpenRouter API key in the "API Key" section. If you don't have an OpenRouter API Key, follow these steps:
-  - Log in to [openrouter.ai](https://openrouter.ai).
-  - Click your profile picture (top-right) and open "Keys".
-  - Click "Create API Key".
-  - Copy the key.
-- Click "Save changes" then "Save Settings" and refresh the page.
-- Enter any sample message (e.g., "hi"); the app will then receive the model data.
-
-
-## How It Works
-
-- The Flask app exposes `/openrouter-cc` and an alias `/chat/completions`. POST your OpenAI-style chat payload here.
-- Authorization: If you set `OPENROUTER_API_KEY`, the server uses it; otherwise the client's `Authorization` header is forwarded.
-- Logging: Each request payload is saved to `var/logs/<timestamp>.json` (old files are pruned by a rolling limit).
-- Parsing: On each saved log (and on demand), the parser writes a TXT export per character, versioned as `<Character Name>.vN.txt`.
-- Tunnel: `cloudflared` publishes a public URL; the dashboard displays both local and public endpoints.
-- Frontend: A Svelte 5 SPA with TypeScript, compiled to static assets served by Flask. Features reactive state management, component-based architecture, and automatic log prefetching.
 
 
 ## Installation (Manual)
