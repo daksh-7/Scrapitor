@@ -10,6 +10,7 @@
   let logModalOpen = $state(false);
   let logModalTitle = $state('');
   let logModalContent = $state('');
+  let logModalFormat = $state<'json' | 'txt'>('json');
   let parsedModalOpen = $state(false);
   let parsedModalTitle = $state('');
   let parsedVersions = $state<Array<{file: string; mtime: number; size: number}>>([]);
@@ -17,6 +18,11 @@
   let confirmOpen = $state(false);
   let confirmMessage = $state('');
   let confirmAction = $state<() => void>(() => {});
+  
+  // Inline rename state for parsed files
+  let renamingParsedFile = $state<string | null>(null);
+  let parsedRenameValue = $state('');
+  let parsedRenameInputRef = $state<HTMLInputElement | null>(null);
 
   const filterLower = $derived(filterText.toLowerCase());
 
@@ -28,9 +34,35 @@
 
   const visibleLogs = $derived(filteredLogs.slice(0, 100));
 
+  // JSON syntax highlighting function
+  function highlightJson(content: string): string {
+    // Escape HTML first
+    const escaped = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    
+    // Apply syntax highlighting with regex
+    return escaped
+      // Match key-value pairs with string keys
+      .replace(/"([^"\\]*(\\.[^"\\]*)*)"\s*:/g, '<span class="json-key">"$1"</span>:')
+      // Match string values (after colon)
+      .replace(/:\s*"([^"\\]*(\\.[^"\\]*)*)"/g, ': <span class="json-string">"$1"</span>')
+      // Match numbers
+      .replace(/:\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, ': <span class="json-number">$1</span>')
+      // Match booleans
+      .replace(/:\s*(true|false)\b/g, ': <span class="json-boolean">$1</span>')
+      // Match null
+      .replace(/:\s*(null)\b/g, ': <span class="json-null">$1</span>')
+      // Match array numbers
+      .replace(/\[\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '[<span class="json-number">$1</span>')
+      .replace(/,\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, ', <span class="json-number">$1</span>');
+  }
+
   async function openLog(name: string) {
     logModalTitle = name;
     logModalContent = 'Loading…';
+    logModalFormat = 'json';
     logModalOpen = true;
 
     try {
@@ -45,6 +77,7 @@
     parsedModalLogName = name;
     parsedModalTitle = `${name} — TXT`;
     parsedVersions = [];
+    renamingParsedFile = null;
     parsedModalOpen = true;
 
     try {
@@ -59,9 +92,20 @@
     }
   }
 
+  async function refreshParsedList() {
+    try {
+      logsStore.clearCachesFor([parsedModalLogName]);
+      const data = await logsStore.getParsedVersions(parsedModalLogName);
+      parsedVersions = data.versions;
+    } catch {
+      // Silent fail
+    }
+  }
+
   async function openParsedContent(logName: string, fileName: string) {
     logModalTitle = `${logName} — ${fileName}`;
     logModalContent = 'Loading…';
+    logModalFormat = 'txt';
     logModalOpen = true;
 
     try {
@@ -117,6 +161,59 @@
 
   function formatSize(size: number): string {
     return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  // Parsed file inline rename functions
+  function startParsedRename(fileName: string) {
+    parsedRenameValue = fileName.replace(/\.txt$/, '');
+    renamingParsedFile = fileName;
+    setTimeout(() => {
+      parsedRenameInputRef?.focus();
+      parsedRenameInputRef?.select();
+    }, 0);
+  }
+
+  async function commitParsedRename() {
+    if (!renamingParsedFile) return;
+    
+    const newBasename = parsedRenameValue.trim();
+    if (!newBasename || newBasename === renamingParsedFile.replace(/\.txt$/, '')) {
+      cancelParsedRename();
+      return;
+    }
+    
+    const newName = newBasename + '.txt';
+    try {
+      await logsStore.renameParsed(parsedModalLogName, renamingParsedFile, newName);
+      uiStore.notify(`Renamed to ${newName}`);
+      await refreshParsedList();
+    } catch (e) {
+      uiStore.notify(e instanceof Error ? e.message : 'Rename failed', 'error');
+    }
+    renamingParsedFile = null;
+  }
+
+  function cancelParsedRename() {
+    renamingParsedFile = null;
+    parsedRenameValue = '';
+  }
+
+  function handleParsedRenameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitParsedRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelParsedRename();
+    }
+  }
+
+  function handleParsedRenameBlur() {
+    setTimeout(() => {
+      if (renamingParsedFile) {
+        commitParsedRename();
+      }
+    }, 100);
   }
 </script>
 
@@ -203,9 +300,14 @@
   title={logModalTitle} 
   onClose={() => logModalOpen = false}
   onBack={parsedModalOpen ? () => { logModalOpen = false; openParsedList(parsedModalLogName); } : undefined}
+  format={logModalFormat}
 >
   {#snippet children()}
-    {logModalContent}
+    {#if logModalFormat === 'json' && logModalContent !== 'Loading…' && !logModalContent.startsWith('Error:')}
+      {@html highlightJson(logModalContent)}
+    {:else}
+      {logModalContent}
+    {/if}
   {/snippet}
 </Modal>
 
@@ -213,20 +315,59 @@
 <Modal
   open={parsedModalOpen}
   title={parsedModalTitle}
-  onClose={() => parsedModalOpen = false}
+  onClose={() => { parsedModalOpen = false; renamingParsedFile = null; }}
 >
   {#snippet children()}
     <div class="version-picker">
       <p class="version-header">Select a version to view:</p>
       <div class="version-list">
-        {#each parsedVersions as version}
-          <button 
-            class="version-item" 
-            onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
-          >
-            <span class="version-name mono">{version.file}</span>
-            <span class="version-meta">{formatDate(version.mtime)} · {formatSize(version.size)}</span>
-          </button>
+        {#each parsedVersions as version (version.file)}
+          <div class="version-item" class:renaming={renamingParsedFile === version.file}>
+            {#if renamingParsedFile === version.file}
+              <div class="version-rename-wrapper">
+                <input 
+                  type="text"
+                  class="version-rename-input"
+                  bind:this={parsedRenameInputRef}
+                  bind:value={parsedRenameValue}
+                  onkeydown={handleParsedRenameKeydown}
+                  onblur={handleParsedRenameBlur}
+                />
+                <span class="version-rename-ext">.txt</span>
+              </div>
+              <div class="version-actions">
+                <button 
+                  class="version-action-btn"
+                  onclick={() => commitParsedRename()}
+                  title="Save"
+                >
+                  <Icon name="check" size={12} />
+                </button>
+                <button 
+                  class="version-action-btn"
+                  onclick={() => cancelParsedRename()}
+                  title="Cancel"
+                >
+                  <Icon name="close" size={12} />
+                </button>
+              </div>
+            {:else}
+              <button 
+                class="version-content"
+                onclick={() => { parsedModalOpen = false; openParsedContent(parsedModalLogName, version.file); }}
+              >
+                <span class="version-name mono">{version.file}</span>
+                <span class="version-meta">{formatDate(version.mtime)} · {formatSize(version.size)}</span>
+              </button>
+              <button 
+                class="version-action-btn version-action-btn--hover"
+                onclick={() => startParsedRename(version.file)}
+                title="Rename"
+              >
+                <Icon name="edit" size={12} />
+              </button>
+            {/if}
+          </div>
         {/each}
       </div>
     </div>
@@ -349,22 +490,38 @@
   .version-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
-    cursor: pointer;
     transition: 
       border-color var(--duration-fast),
       background-color var(--duration-fast);
-    text-align: left;
   }
 
   .version-item:hover {
     border-color: var(--accent-border);
     background: var(--accent-subtle);
+  }
+
+  .version-item.renaming {
+    border-color: var(--accent);
+    background: var(--bg-hover);
+  }
+
+  .version-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+    gap: var(--space-md);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
   }
 
   .version-name {
@@ -376,6 +533,76 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     flex-shrink: 0;
+  }
+
+  /* Inline rename for parsed files */
+  .version-rename-wrapper {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .version-rename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 6px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    outline: none;
+  }
+
+  .version-rename-input:focus {
+    box-shadow: 0 0 0 2px var(--accent-subtle);
+  }
+
+  .version-rename-ext {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-left: 2px;
+    flex-shrink: 0;
+  }
+
+  .version-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
+  .version-action-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: 
+      color var(--duration-fast),
+      background-color var(--duration-fast);
+    flex-shrink: 0;
+  }
+
+  .version-action-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-active);
+  }
+
+  .version-action-btn--hover {
+    opacity: 0;
+  }
+
+  .version-item:hover .version-action-btn--hover {
+    opacity: 1;
   }
 
   @media (max-width: 640px) {
