@@ -3,7 +3,6 @@
   import Sidebar from './lib/components/Sidebar.svelte';
   import Topbar from './lib/components/Topbar.svelte';
   import Overview from './routes/Overview.svelte';
-  import Setup from './routes/Setup.svelte';
   import Parser from './routes/Parser.svelte';
   import Activity from './routes/Activity.svelte';
   import Notification from './lib/components/Notification.svelte';
@@ -77,8 +76,6 @@
         <div class="page">
           {#if uiStore.activeSection === 'overview'}
             <Overview />
-          {:else if uiStore.activeSection === 'setup'}
-            <Setup />
           {:else if uiStore.activeSection === 'parser'}
             <Parser />
           {:else if uiStore.activeSection === 'activity'}

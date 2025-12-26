@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { logsStore } from '$lib/stores';
+  import { logsStore, uiStore } from '$lib/stores';
   import Icon from './Icon.svelte';
 
   interface Props {
@@ -8,10 +8,14 @@
     selected?: boolean;
     onclick: () => void;
     onOpenParsed?: () => void;
-    onRename?: () => void;
   }
 
-  let { name, selectable = false, selected = false, onclick, onOpenParsed, onRename }: Props = $props();
+  let { name, selectable = false, selected = false, onclick, onOpenParsed }: Props = $props();
+
+  // Inline rename state
+  let isRenaming = $state(false);
+  let renameValue = $state('');
+  let inputRef = $state<HTMLInputElement | null>(null);
 
   const meta = $derived(logsStore.getMeta(name));
 
@@ -28,17 +32,68 @@
       return '';
     }
   }
+
+  function startRename(e: Event) {
+    e.stopPropagation();
+    renameValue = name.replace(/\.json$/, '');
+    isRenaming = true;
+    setTimeout(() => {
+      inputRef?.focus();
+      inputRef?.select();
+    }, 0);
+  }
+
+  async function commitRename() {
+    const newBasename = renameValue.trim();
+    if (!newBasename || newBasename === name.replace(/\.json$/, '')) {
+      cancelRename();
+      return;
+    }
+    
+    const newName = newBasename + '.json';
+    try {
+      await logsStore.rename(name, newName);
+      uiStore.notify(`Renamed to ${newName}`);
+    } catch (e) {
+      uiStore.notify(e instanceof Error ? e.message : 'Rename failed', 'error');
+    }
+    isRenaming = false;
+  }
+
+  function cancelRename() {
+    isRenaming = false;
+    renameValue = '';
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelRename();
+    }
+  }
+
+  function handleBlur() {
+    setTimeout(() => {
+      if (isRenaming) {
+        commitRename();
+      }
+    }, 100);
+  }
 </script>
 
 <div 
   class="log-item"
   class:selectable
   class:selected
+  class:renaming={isRenaming}
   data-name={name}
-  {onclick}
+  onclick={() => !isRenaming && onclick()}
   role="button"
   tabindex="0"
-  onkeydown={(e) => e.key === 'Enter' && onclick()}
+  onkeydown={(e) => !isRenaming && e.key === 'Enter' && onclick()}
 >
   <div class="log-main">
     {#if selectable}
@@ -48,29 +103,62 @@
         {/if}
       </div>
     {/if}
-    <span class="log-filename">{name}</span>
+    
+    {#if isRenaming}
+      <div class="rename-input-wrapper">
+        <input 
+          type="text"
+          class="rename-input"
+          bind:this={inputRef}
+          bind:value={renameValue}
+          onkeydown={handleKeydown}
+          onblur={handleBlur}
+          onclick={(e) => e.stopPropagation()}
+        />
+        <span class="rename-ext">.json</span>
+      </div>
+    {:else}
+      <span class="log-filename">{name}</span>
+    {/if}
   </div>
   
   <div class="log-actions">
-    {#if onOpenParsed && !selectable}
+    {#if isRenaming}
       <button 
-        class="action-chip" 
-        onclick={(e) => { e.stopPropagation(); onOpenParsed?.(); }}
-        title="View parsed TXT versions"
+        class="action-btn action-btn--visible" 
+        onclick={(e) => { e.stopPropagation(); commitRename(); }}
+        title="Save"
       >
-        TXT
+        <Icon name="check" size={12} />
       </button>
-    {/if}
-    {#if onRename && !selectable}
       <button 
-        class="action-btn" 
-        onclick={(e) => { e.stopPropagation(); onRename?.(); }}
-        title="Rename"
+        class="action-btn action-btn--visible" 
+        onclick={(e) => { e.stopPropagation(); cancelRename(); }}
+        title="Cancel"
       >
-        <Icon name="edit" size={12} />
+        <Icon name="close" size={12} />
       </button>
+    {:else}
+      {#if onOpenParsed && !selectable}
+        <button 
+          class="action-chip" 
+          onclick={(e) => { e.stopPropagation(); onOpenParsed?.(); }}
+          title="View parsed TXT versions"
+        >
+          TXT
+        </button>
+      {/if}
+      {#if !selectable}
+        <button 
+          class="action-btn" 
+          onclick={startRename}
+          title="Rename"
+        >
+          <Icon name="edit" size={12} />
+        </button>
+      {/if}
+      <span class="log-time">{formatTime(meta?.mtime)}</span>
     {/if}
-    <span class="log-time">{formatTime(meta?.mtime)}</span>
   </div>
 </div>
 
@@ -101,6 +189,11 @@
 
   .log-item.selected {
     background: var(--accent-subtle);
+    border-color: var(--accent-border);
+  }
+
+  .log-item.renaming {
+    background: var(--bg-hover);
     border-color: var(--accent-border);
   }
 
@@ -141,6 +234,40 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Inline rename input */
+  .rename-input-wrapper {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 2px 6px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    outline: none;
+  }
+
+  .rename-input:focus {
+    box-shadow: 0 0 0 2px var(--accent-subtle);
+  }
+
+  .rename-ext {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-left: 2px;
+    flex-shrink: 0;
   }
 
   .log-actions {
@@ -202,6 +329,10 @@
   }
 
   .log-item:hover .action-btn {
+    opacity: 1;
+  }
+
+  .action-btn--visible {
     opacity: 1;
   }
 

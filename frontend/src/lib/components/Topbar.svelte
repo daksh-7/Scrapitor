@@ -1,6 +1,5 @@
 <script lang="ts">
   import { uiStore } from '$lib/stores';
-  import Icon from './Icon.svelte';
 
   interface Props {
     onRefresh: () => void;
@@ -10,15 +9,13 @@
   let spinning = $state(false);
 
   const sectionTitles: Record<string, string> = {
-    overview: 'Overview',
-    setup: 'Setup',
+    overview: 'Dashboard',
     parser: 'Parser',
     activity: 'Activity',
   };
 
   const sectionDescriptions: Record<string, string> = {
-    overview: 'System metrics and status',
-    setup: 'Configure your proxy connection',
+    overview: 'Metrics, endpoints, and quick start guide',
     parser: 'Tag filtering and output settings',
     activity: 'Request logs and history',
   };

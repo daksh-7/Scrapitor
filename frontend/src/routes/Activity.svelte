@@ -36,25 +36,17 @@
 
   // JSON syntax highlighting function
   function highlightJson(content: string): string {
-    // Escape HTML first
     const escaped = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     
-    // Apply syntax highlighting with regex
     return escaped
-      // Match key-value pairs with string keys
       .replace(/"([^"\\]*(\\.[^"\\]*)*)"\s*:/g, '<span class="json-key">"$1"</span>:')
-      // Match string values (after colon)
       .replace(/:\s*"([^"\\]*(\\.[^"\\]*)*)"/g, ': <span class="json-string">"$1"</span>')
-      // Match numbers
       .replace(/:\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, ': <span class="json-number">$1</span>')
-      // Match booleans
       .replace(/:\s*(true|false)\b/g, ': <span class="json-boolean">$1</span>')
-      // Match null
       .replace(/:\s*(null)\b/g, ': <span class="json-null">$1</span>')
-      // Match array numbers
       .replace(/\[\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, '[<span class="json-number">$1</span>')
       .replace(/,\s*(-?\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g, ', <span class="json-number">$1</span>');
   }

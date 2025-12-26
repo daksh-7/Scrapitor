@@ -1,7 +1,6 @@
 <script lang="ts">
   import Section from '$lib/components/Section.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
-  import LogItem from '$lib/components/LogItem.svelte';
   import Icon from '$lib/components/Icon.svelte';
   import { parserStore, logsStore, uiStore } from '$lib/stores';
 
@@ -297,7 +296,7 @@
   }
 
   .mode-desc {
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     color: var(--text-muted);
     line-height: 1.4;
   }
@@ -326,6 +325,7 @@
     background: var(--bg-elevated);
     border-radius: var(--radius-md);
     border: 1px dashed var(--border-default);
+    font-size: 0.875rem;
   }
 
   .parser-actions {
@@ -363,7 +363,7 @@
   }
 
   .detect-item span {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     color: var(--text-secondary);
   }
 
@@ -406,7 +406,7 @@
   }
 
   .write-option-desc {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     color: var(--text-muted);
   }
 

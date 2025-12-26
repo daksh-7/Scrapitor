@@ -3,8 +3,7 @@
   import Icon from './Icon.svelte';
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: 'home' as const },
-    { id: 'setup', label: 'Setup', icon: 'settings' as const },
+    { id: 'overview', label: 'Dashboard', icon: 'home' as const },
     { id: 'parser', label: 'Parser', icon: 'layers' as const },
     { id: 'activity', label: 'Activity', icon: 'activity' as const },
   ];
@@ -61,7 +60,7 @@
     </button>
   </div>
 
-  <nav class="nav" role="navigation" aria-label="Primary">
+  <nav class="nav" aria-label="Primary">
     {#each navItems as item}
       <button
         class="nav-item"

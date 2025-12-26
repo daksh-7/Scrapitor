@@ -32,10 +32,10 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: var(--radius-full);
     border: 1px solid var(--border-default);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 500;
     background: var(--bg-elevated);
     cursor: pointer;

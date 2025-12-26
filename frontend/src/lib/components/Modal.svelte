@@ -10,9 +10,10 @@
     onBack?: () => void;
     children: Snippet;
     actions?: Snippet;
+    format?: 'json' | 'txt' | 'auto';
   }
 
-  let { open, title, onClose, onBack, children, actions }: Props = $props();
+  let { open, title, onClose, onBack, children, actions, format = 'auto' }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -57,7 +58,7 @@
           </button>
         </div>
       </div>
-      <div class="modal-body modal-body--mono">
+      <div class="modal-body modal-body--mono" class:modal-body--txt={format === 'txt'}>
         {@render children()}
       </div>
     </div>
@@ -79,5 +80,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Pure white text for TXT files - meant to be read by users */
+  .modal-body--txt {
+    color: #ffffff;
   }
 </style>
