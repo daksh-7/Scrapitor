@@ -5,7 +5,7 @@
 <h1 align="center">scrapitor</h1>
 
 <p align="center">
-  <em>Intercept. Parse. Export. Your JanitorAI requests, beautifully captured.</em>
+  <em>Intercept. Parse. Export.</em>
 </p>
 
 <p align="center">
