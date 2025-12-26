@@ -1,6 +1,6 @@
 # scrapitor
 
-Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into clean character sheets (TXT) using a rule-driven parser. Run it via the **Windows launcher (`run.bat`) (recommended)** or via Docker Compose.
+Local JanitorAI proxy and structured log parser with a dashboard. It launches a Flask gateway that proxies JanitorAI traffic to OpenRouter, automatically saves every request as a JSON log, and can convert those logs into SillyTavern-compatible clean character sheets using a rule-driven parser. Run it via the **Windows launcher (`run.bat`) (recommended)** or via Docker Compose.
 
 If you prefer the shortest path, jump to [Installation](#installation) or [Casual Usage](#casual-usage).
 
