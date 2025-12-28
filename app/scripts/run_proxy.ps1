@@ -311,21 +311,24 @@ function Main {
         Save-PidFile -Path $Config.PidFile -Pids @($flaskProcess.Id, $cfProcess.Id) | Out-Null
         
         Show-UrlBox -TunnelUrl $tunnelUrl -Port $Config.Port
-        Show-QuickHelp
+        Show-QuickHelp -Port $Config.Port
         
         # ── Main Loop ─────────────────────────────────────────────────────────
-        $exitReason = Wait-ForQuitKey -OnTick {
-            if (-not (Test-ManagedProcessRunning -Name 'flask')) {
+        $exitReason = Wait-ForQuitKey -ShowLiveStatus -OnTick {
+            $flaskOk = Test-ManagedProcessRunning -Name 'flask'
+            $tunnelOk = Test-ManagedProcessRunning -Name 'cloudflared'
+            
+            if (-not $flaskOk) {
                 Write-Host ""
                 Write-Status -Message "Flask process died unexpectedly" -Type Error
                 return 'exit'
             }
-            if (-not (Test-ManagedProcessRunning -Name 'cloudflared')) {
+            if (-not $tunnelOk) {
                 Write-Host ""
                 Write-Status -Message "Cloudflared process died unexpectedly" -Type Error
                 return 'exit'
             }
-            return $null
+            return @{ FlaskOk = $flaskOk; TunnelOk = $tunnelOk }
         }
         
         return 0
