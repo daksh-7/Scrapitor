@@ -1,78 +1,52 @@
 @echo off
-setlocal
-REM Run from this script's directory
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-REM Optional: Update repo if Git is available and this is a git clone
-set "HAS_GIT=0"
-where git >nul 2>nul
-if not errorlevel 1 (
-  set "HAS_GIT=1"
+:: ═══════════════════════════════════════════════════════════════════════════
+::  Scrapitor Launcher
+:: ═══════════════════════════════════════════════════════════════════════════
+
+:: Silent git update (if available)
+where git >nul 2>nul && if exist ".git" (
+    git fetch --all --tags --prune >nul 2>nul
+    git pull --rebase --autostash >nul 2>nul
 )
 
-if "%HAS_GIT%"=="1" (
-  if exist ".git" (
-    echo Updating Scrapitor from origin...
-    git fetch --all --tags --prune
-    if errorlevel 1 (
-      echo Git fetch failed. Proceeding without updating.
-    ) else (
-      git pull --rebase --autostash
-      if errorlevel 1 echo Git pull failed ^(local changes or connectivity^). Proceeding without updating.
-    )
-  ) else (
-    echo This folder is not a Git clone. To receive updates automatically, use Git:
-    echo   winget install git.git
-    echo   git clone https://github.com/daksh-7/Scrapitor
-  )
-) else (
-  echo Git was not found. To update in the future, either:
-  echo   - Download the latest ZIP: https://github.com/daksh-7/Scrapitor
-  echo   - Or install Git: winget install git.git
-)
-
-REM Target script path
-set "SCRIPT=%~dp0app\scripts\run_proxy.ps1"
-if not exist "%SCRIPT%" (
-  echo ERROR: Cannot find PowerShell script at "%SCRIPT%"
-  echo.
-  pause
-  exit /b 1
-)
-
-REM Detect PowerShell 7 (pwsh)
-set "POWERSHELL="
-set "HAS_PWSH=0"
+:: Find PowerShell 7
+set "PS="
 if exist "%ProgramFiles%\PowerShell\7\pwsh.exe" (
-  set "POWERSHELL=%ProgramFiles%\PowerShell\7\pwsh.exe"
-  set "HAS_PWSH=1"
+    set "PS=%ProgramFiles%\PowerShell\7\pwsh.exe"
+) else if exist "%ProgramFiles%\PowerShell\7-preview\pwsh.exe" (
+    set "PS=%ProgramFiles%\PowerShell\7-preview\pwsh.exe"
 ) else (
-  if exist "%ProgramFiles%\PowerShell\7-preview\pwsh.exe" (
-    set "POWERSHELL=%ProgramFiles%\PowerShell\7-preview\pwsh.exe"
-    set "HAS_PWSH=1"
-  ) else (
-    where pwsh.exe >nul 2>nul
-    if not errorlevel 1 (
-      set "POWERSHELL=pwsh.exe"
-      set "HAS_PWSH=1"
-    )
-  )
+    where pwsh.exe >nul 2>nul && set "PS=pwsh.exe"
 )
 
-if "%HAS_PWSH%"=="0" (
-  echo ERROR: PowerShell 7 ^(pwsh^) is required but was not found.
-  echo.
-  echo Install it with:
-  echo    winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
-  echo.
-  echo After installation, re-run this script.
-  echo.
-  pause
-  exit /b 1
-)
-goto launch
+if not defined PS goto :no_pwsh
 
-:launch
-
-start "" "%POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
+:: Launch Scrapitor
+start "" "%PS%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\scripts\run_proxy.ps1"
 exit /b 0
+
+:: ═══════════════════════════════════════════════════════════════════════════
+::  Error: PowerShell 7 Required
+:: ═══════════════════════════════════════════════════════════════════════════
+:no_pwsh
+:: Generate ESC character for ANSI colors
+for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
+
+cls
+echo.
+echo   %ESC%[91m════════════════════════════════════════════════════════════%ESC%[0m
+echo.
+echo   %ESC%[91m  PowerShell 7 is required but was not found.%ESC%[0m
+echo.
+echo   %ESC%[93m  Install it with:%ESC%[0m
+echo   %ESC%[96m  winget install Microsoft.PowerShell%ESC%[0m
+echo.
+echo   %ESC%[90m  Then re-run this script.%ESC%[0m
+echo.
+echo   %ESC%[91m════════════════════════════════════════════════════════════%ESC%[0m
+echo.
+pause
+exit /b 1
