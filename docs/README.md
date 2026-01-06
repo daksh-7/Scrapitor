@@ -51,26 +51,49 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 
 ## Architecture
 
-```
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   JanitorAI     │ ───► │    Scrapitor     │ ───► │   OpenRouter    │
-│   (Browser)     │      │  (Flask Proxy)   │      │      API        │
-└─────────────────┘      └──────────────────┘      └─────────────────┘
-                                  │
-                    ┌─────────────┼─────────────┐
-                    ▼             ▼             ▼
-              ┌──────────┐ ┌──────────┐ ┌──────────────┐
-              │ JSON Log │ │  Parser  │ │  Dashboard   │
-              │  Files   │ │  Engine  │ │  (Svelte 5)  │
-              └──────────┘ └──────────┘ └──────────────┘
-                    │             │
-                    └──────┬──────┘
-                           ▼
-                    ┌──────────────┐
-                    │ Parsed TXT / │
-                    │ SillyTavern  │
-                    │    Export    │
-                    └──────────────┘
+```mermaid
+graph LR
+    %% --- NODES & DATA ---
+    J([JanitorAI<br/>Browser Client])
+    S[Scrapitor<br/>Flask Proxy]
+    OR(OpenRouter<br/>API)
+
+    subgraph Data_Processing [Data Processing & UI]
+        direction TB
+        L[(JSON Log<br/>Files)]
+        P[[Parser<br/>Engine]]
+        D(Dashboard<br/>Svelte 5)
+        E[/Parsed TXT /<br/>SillyTavern Export/]
+    end
+
+    %% --- CONNECTIONS ---
+    %% Bi-directional traffic flow
+    J <==>|HTTP Request<br/>& Response| S
+    S <==>|Forward &<br/>Inference| OR
+    
+    %% Internal Data flow
+    S -.->|Live State| D
+    S -- Capture<br/>Completion --> L
+    L -.->|Read| P
+    P -->|Generate| E
+
+    %% --- STYLING ---
+    classDef base fill:#fff,stroke:#333,stroke-width:1px,color:#333;
+    classDef client fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1;
+    classDef proxy fill:#e8eaf6,stroke:#3949ab,stroke-width:3px,color:#1a237e;
+    classDef external fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray: 5 5,color:#4a148c;
+    classDef storage fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#004d40;
+    classDef ui fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f;
+    
+    %% Apply Styles
+    class J client;
+    class S proxy;
+    class OR external;
+    class L,P,E storage;
+    class D ui;
+
+    %% Style Subgraph
+    style Data_Processing fill:#ffffff,stroke:#e0e0e0,stroke-width:2px,stroke-dasharray: 5 5,color:#9e9e9e
 ```
 
 **Data Flow:**
