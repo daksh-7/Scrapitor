@@ -122,10 +122,7 @@ git clone https://github.com/daksh-7/Scrapitor
 cd Scrapitor
 ```
 
-**Run:**
-```
-Double-click run.bat
-```
+**Then:** Double-click run.bat
 
 The launcher will:
 - Create a virtual environment and install dependencies
