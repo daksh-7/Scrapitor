@@ -223,27 +223,31 @@ function Get-LanIPAddress {
     [CmdletBinding()]
     param()
 
+    # Method 1: Socket connect to public IP - most reliable way to find the real LAN IP
     try {
-        # Get the first IPv4 address that's not loopback and is on an Up interface
-        $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.IPAddress -ne '127.0.0.1' -and
-                $_.PrefixOrigin -ne 'WellKnown' -and
-                (Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue).Status -eq 'Up'
-            } |
-            Select-Object -First 1 -ExpandProperty IPAddress
-
-        if ($ip) { return $ip }
-    }
-    catch { }
-
-    # Fallback: try socket method
-    try {
-        $socket = [System.Net.Sockets.Socket]::new([System.Net.Sockets.AddressFamily]::InterNetwork, [System.Net.Sockets.SocketType]::Dgram, 0)
+        $socket = [System.Net.Sockets.Socket]::new(
+            [System.Net.Sockets.AddressFamily]::InterNetwork,
+            [System.Net.Sockets.SocketType]::Dgram,
+            [System.Net.Sockets.ProtocolType]::Udp
+        )
         $socket.Connect("8.8.8.8", 53)
         $ip = ($socket.LocalEndPoint -as [System.Net.IPEndPoint]).Address.ToString()
         $socket.Close()
-        return $ip
+        if ($ip -and $ip -ne '127.0.0.1') { return $ip }
+    }
+    catch { }
+
+    # Method 2: Find adapter with default gateway (0.0.0.0/0 route)
+    try {
+        $defaultRoute = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+            Where-Object { $_.NextHop -ne '0.0.0.0' } |
+            Select-Object -First 1
+
+        if ($defaultRoute) {
+            $ip = Get-NetIPAddress -InterfaceIndex $defaultRoute.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                Select-Object -First 1 -ExpandProperty IPAddress
+            if ($ip) { return $ip }
+        }
     }
     catch { }
 
