@@ -194,13 +194,7 @@ function Main {
             -VenvPython $Config.VenvPython `
             -VenvPythonW $Config.VenvPythonW `
             -PidFile $Config.PidFile
-
-        # ── Firewall Rule for LAN Access ──────────────────────────────────────
-        $fwResult = Ensure-FirewallRule -Port $Config.Port
-        if ($fwResult.Created) {
-            Write-Status -Message "Firewall rule created for LAN access" -Type Success
-        }
-
+        
         # ── Start Flask ───────────────────────────────────────────────────────
         Write-Section -Title "Starting Services"
         
