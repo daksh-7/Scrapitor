@@ -76,4 +76,40 @@
     gap: var(--space-sm);
     justify-content: flex-end;
   }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    /* Keep confirm modal centered on mobile instead of bottom-aligned */
+    :global(.modal:has(.modal-panel--sm)) {
+      align-items: center;
+      padding: var(--space-lg);
+      /* Shift content down to account for browser URL bar */
+      padding-top: 80px;
+    }
+
+    :global(.modal-panel--sm) {
+      max-height: calc(100% - 100px);
+      margin-top: 0;
+      border-radius: var(--radius-xl);
+      animation: fadeInUp var(--duration-normal) var(--ease-out);
+    }
+
+    .confirm-message {
+      font-size: 0.9375rem;
+      text-align: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .confirm-actions {
+      flex-direction: column-reverse;
+      gap: var(--space-sm);
+    }
+
+    .confirm-actions .btn {
+      width: 100%;
+      min-height: 48px;
+      justify-content: center;
+      font-size: 0.9375rem;
+    }
+  }
 </style>

@@ -27,9 +27,35 @@
   function toggleCollapse() {
     collapsed = !collapsed;
   }
+
+  function handleBackdropClick() {
+    uiStore.closeMobileMenu();
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && uiStore.mobileMenuOpen) {
+      uiStore.closeMobileMenu();
+    }
+  }
 </script>
 
-<aside class="sidebar" class:collapsed aria-label="Main navigation">
+<svelte:window onkeydown={handleKeydown} />
+
+<!-- Mobile backdrop -->
+{#if uiStore.mobileMenuOpen}
+  <button
+    class="mobile-backdrop"
+    onclick={handleBackdropClick}
+    aria-label="Close menu"
+  ></button>
+{/if}
+
+<aside
+  class="sidebar"
+  class:collapsed
+  class:mobile-open={uiStore.mobileMenuOpen}
+  aria-label="Main navigation"
+>
   <div class="sidebar-header">
     <div class="brand" aria-label="Scrapitor - Local OpenRouter Gateway">
       <div class="logo">
@@ -41,8 +67,8 @@
         </div>
       {/if}
     </div>
-    <button 
-      class="collapse-btn" 
+    <button
+      class="collapse-btn hide-mobile"
       onclick={toggleCollapse}
       aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       title={collapsed ? 'Expand' : 'Collapse'}
@@ -54,6 +80,14 @@
           <path d="M15 18l-6-6 6-6"/>
         {/if}
       </svg>
+    </button>
+    <!-- Mobile close button -->
+    <button
+      class="close-btn show-mobile"
+      onclick={handleBackdropClick}
+      aria-label="Close menu"
+    >
+      <Icon name="close" size={20} />
     </button>
   </div>
 
@@ -77,8 +111,8 @@
   <div class="sidebar-footer">
     {#if !collapsed}
       <div class="quick-links">
-        <button 
-          class="link-btn" 
+        <button
+          class="link-btn"
           onclick={openCloudflare}
           disabled={!uiStore.cloudflareUrl}
           title={uiStore.cloudflareUrl || 'Not available'}
@@ -86,8 +120,8 @@
           <Icon name="externalLink" size={14} />
           <span>Cloudflare</span>
         </button>
-        <button 
-          class="link-btn" 
+        <button
+          class="link-btn"
           onclick={openLocal}
           title={uiStore.localUrl}
         >
@@ -97,8 +131,8 @@
       </div>
     {:else}
       <div class="quick-links-collapsed">
-        <button 
-          class="link-btn-icon" 
+        <button
+          class="link-btn-icon"
           onclick={openCloudflare}
           disabled={!uiStore.cloudflareUrl}
           title="Open Cloudflare URL"
@@ -111,6 +145,26 @@
 </aside>
 
 <style>
+  /* Mobile backdrop overlay */
+  .mobile-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 90;
+    border: none;
+    cursor: pointer;
+    animation: fadeIn var(--duration-fast) var(--ease-out);
+  }
+
+  @media (max-width: 767px) {
+    .mobile-backdrop {
+      display: block;
+    }
+  }
+
   .sidebar {
     width: 240px;
     flex: 0 0 240px;
@@ -217,6 +271,27 @@
     border-color: var(--border-default);
   }
 
+  /* Mobile close button */
+  .close-btn {
+    display: none;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: color var(--duration-fast), background-color var(--duration-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-active);
+  }
+
   .nav {
     flex: 1;
     display: flex;
@@ -238,12 +313,13 @@
     border: none;
     background: transparent;
     cursor: pointer;
-    transition: 
+    transition:
       color var(--duration-fast),
       background-color var(--duration-fast);
     text-align: left;
     width: 100%;
     white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .collapsed .nav-item {
@@ -296,6 +372,7 @@
     transition: color var(--duration-fast), background-color var(--duration-fast);
     text-align: left;
     width: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .link-btn:hover:not(:disabled) {
@@ -325,6 +402,7 @@
     cursor: pointer;
     border-radius: var(--radius-md);
     transition: color var(--duration-fast), background-color var(--duration-fast);
+    -webkit-tap-highlight-color: transparent;
   }
 
   .link-btn-icon:hover:not(:disabled) {
@@ -337,37 +415,95 @@
     cursor: not-allowed;
   }
 
-  @media (max-width: 768px) {
+  /* Hide mobile-specific elements on desktop */
+  .hide-mobile {
+    display: flex;
+  }
+
+  .show-mobile {
+    display: none;
+  }
+
+  /* ── Mobile styles ───────────────────────────────────────── */
+  @media (max-width: 767px) {
+    .hide-mobile {
+      display: none !important;
+    }
+
+    .show-mobile {
+      display: flex !important;
+    }
+
     .sidebar {
-      width: 100%;
-      flex: 0 0 auto;
-      height: auto;
-      position: relative;
-      border-right: none;
-      border-bottom: 1px solid var(--border-subtle);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      max-width: 85vw;
+      height: 100vh;
+      z-index: 100;
+      transform: translateX(-100%);
+      transition: transform var(--duration-normal) var(--ease-out);
+      border-right: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .sidebar.mobile-open {
+      transform: translateX(0);
     }
 
     .sidebar.collapsed {
-      width: 100%;
-      flex: 0 0 auto;
+      width: 280px;
+      max-width: 85vw;
+    }
+
+    .collapsed .sidebar-header {
+      flex-direction: row;
+      padding: var(--space-lg);
     }
 
     .nav {
-      flex-direction: row;
-      overflow-x: auto;
-      flex: 0 0 auto;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: visible;
+      flex: 1;
+      padding: var(--space-md);
+      gap: var(--space-xs);
     }
 
     .nav-item {
-      flex: 0 0 auto;
+      min-height: var(--touch-target-min);
+      padding: var(--space-md) var(--space-lg);
+      font-size: 1rem;
+    }
+
+    .collapsed .nav-item {
+      justify-content: flex-start;
+      padding: var(--space-md) var(--space-lg);
+    }
+
+    .nav-label {
+      display: block !important;
     }
 
     .sidebar-footer {
-      display: none;
+      display: block;
+      padding: var(--space-md);
+      padding-bottom: calc(var(--space-md) + var(--safe-area-bottom));
     }
 
-    .collapse-btn {
-      display: none;
+    .quick-links {
+      gap: var(--space-xs);
+    }
+
+    .link-btn {
+      min-height: var(--touch-target-min);
+      padding: var(--space-sm) var(--space-md);
+      font-size: 0.875rem;
+    }
+
+    .close-btn {
+      display: flex;
     }
   }
 </style>

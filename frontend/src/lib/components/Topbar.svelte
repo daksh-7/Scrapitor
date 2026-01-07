@@ -1,5 +1,6 @@
 <script lang="ts">
   import { uiStore } from '$lib/stores';
+  import Icon from './Icon.svelte';
 
   interface Props {
     onRefresh: () => void;
@@ -28,9 +29,23 @@
     await onRefresh();
     setTimeout(() => spinning = false, 500);
   }
+
+  function openMobileMenu() {
+    uiStore.toggleMobileMenu();
+  }
 </script>
 
 <header class="topbar">
+  <!-- Mobile hamburger menu button -->
+  <button
+    class="menu-btn"
+    onclick={openMobileMenu}
+    aria-label="Open menu"
+    aria-expanded={uiStore.mobileMenuOpen}
+  >
+    <Icon name="menu" size={22} />
+  </button>
+
   <div class="topbar-content">
     <div class="topbar-title-group">
       <h1 class="topbar-title">{currentTitle}</h1>
@@ -39,23 +54,23 @@
       {/if}
     </div>
   </div>
-  
+
   <div class="topbar-actions">
-    <button 
-      class="btn btn-ghost" 
+    <button
+      class="btn btn-ghost"
       onclick={handleRefresh}
-      title="Refresh data" 
+      title="Refresh data"
       aria-label="Refresh data"
     >
-      <svg 
-        class="refresh-icon" 
+      <svg
+        class="refresh-icon"
         class:spinning
         width="14"
         height="14"
-        viewBox="0 0 24 24" 
-        fill="none" 
-        stroke="currentColor" 
-        stroke-width="2" 
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
         stroke-linecap="round"
         aria-hidden="true"
       >
@@ -79,6 +94,32 @@
     justify-content: space-between;
     padding: var(--space-lg) var(--space-2xl);
     gap: var(--space-md);
+  }
+
+  /* Mobile menu button - hidden on desktop */
+  .menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: color var(--duration-fast), background-color var(--duration-fast);
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+
+  .menu-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .menu-btn:active {
+    background: var(--bg-active);
   }
 
   .topbar-content {
@@ -124,13 +165,26 @@
     font-weight: 500;
   }
 
-  @media (max-width: 640px) {
+  /* Tablet breakpoint */
+  @media (max-width: 1023px) {
     .topbar {
-      padding: var(--space-md) var(--space-lg);
+      padding: var(--space-md) var(--space-xl);
+    }
+  }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    .topbar {
+      padding: var(--space-sm) var(--space-md);
+      gap: var(--space-sm);
+    }
+
+    .menu-btn {
+      display: flex;
     }
 
     .topbar-title {
-      font-size: 1.25rem;
+      font-size: 1.125rem;
     }
 
     .topbar-description {
@@ -139,6 +193,26 @@
 
     .btn-text {
       display: none;
+    }
+
+    .topbar-actions .btn {
+      padding: 0.5rem;
+    }
+  }
+
+  /* Small mobile breakpoint */
+  @media (max-width: 479px) {
+    .topbar {
+      padding: var(--space-xs) var(--space-sm);
+    }
+
+    .topbar-title {
+      font-size: 1rem;
+    }
+
+    .menu-btn {
+      width: 36px;
+      height: 36px;
     }
   }
 </style>
