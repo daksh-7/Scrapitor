@@ -47,10 +47,11 @@ The entire frontend has been redesigned to work seamlessly on mobile devices:
 
 ### LAN Access Support
 
-- **Network-wide Dashboard Access** — Dashboard URL now displayed for LAN access
+- **Network-wide Dashboard Access** — Dashboard now accessible from any device on the same network
   - Automatically detects local network IP address
   - Displays LAN URL between localhost and Cloudflare tunnel URLs
-  - Access dashboard from any device on the same network (phones, tablets, other computers)
+  - Access dashboard from phones, tablets, or other computers on your network
+  - Automatically creates Windows Firewall inbound rule on startup
   - Works on both Windows (PowerShell) and Docker deployments
 
 ### Bug Fixes
