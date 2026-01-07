@@ -308,6 +308,42 @@ function Get-LogContent {
     }
 }
 
+# ── Firewall ─────────────────────────────────────────────────────────────────
+
+function Ensure-FirewallRule {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][int]$Port,
+        [string]$Name = "Scrapitor"
+    )
+
+    $ruleName = "$Name (Port $Port)"
+
+    try {
+        # Check if rule already exists
+        $existing = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+        if ($existing) {
+            return @{ Success = $true; Created = $false; Message = "Firewall rule already exists" }
+        }
+
+        # Create inbound rule for TCP
+        New-NetFirewallRule `
+            -DisplayName $ruleName `
+            -Direction Inbound `
+            -Protocol TCP `
+            -LocalPort $Port `
+            -Action Allow `
+            -Profile Private,Domain `
+            -ErrorAction Stop | Out-Null
+
+        return @{ Success = $true; Created = $true; Message = "Firewall rule created" }
+    }
+    catch {
+        # Non-admin users can't create firewall rules - this is expected
+        return @{ Success = $false; Created = $false; Message = $_.Exception.Message }
+    }
+}
+
 # ── Export ────────────────────────────────────────────────────────────────────
 Export-ModuleMember -Function @(
     'Start-ManagedProcess',
@@ -319,6 +355,7 @@ Export-ModuleMember -Function @(
     'Wait-ForHealth',
     'Save-PidFile',
     'Remove-PidFile',
-    'Get-LogContent'
+    'Get-LogContent',
+    'Ensure-FirewallRule'
 )
 
