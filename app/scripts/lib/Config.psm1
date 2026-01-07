@@ -6,6 +6,47 @@ Set-StrictMode -Version Latest
 # ══════════════════════════════════════════════════════════════════════════════
 
 $script:Config = $null
+$script:EnvLoaded = $false
+
+function Import-DotEnv {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot
+    )
+
+    if ($script:EnvLoaded) { return }
+
+    $envFile = Join-Path $RepoRoot '.env'
+    if (-not (Test-Path $envFile)) { return }
+
+    try {
+        $lines = Get-Content $envFile -ErrorAction Stop
+        foreach ($line in $lines) {
+            $line = $line.Trim()
+            # Skip comments and empty lines
+            if (-not $line -or $line.StartsWith('#')) { continue }
+
+            # Parse KEY=VALUE (supports quotes)
+            if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') {
+                $key = $matches[1]
+                $value = $matches[2].Trim()
+
+                # Remove surrounding quotes if present
+                if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+                    ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+                    $value = $value.Substring(1, $value.Length - 2)
+                }
+
+                # Only set if not already defined (env vars take precedence)
+                if (-not [Environment]::GetEnvironmentVariable($key, 'Process')) {
+                    [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+                }
+            }
+        }
+        $script:EnvLoaded = $true
+    }
+    catch { }
+}
 
 function Get-ScrapitorConfig {
     [CmdletBinding()]
@@ -13,9 +54,12 @@ function Get-ScrapitorConfig {
         [string]$AppRoot,
         [string]$RepoRoot
     )
-    
+
     if ($script:Config) { return $script:Config }
-    
+
+    # Load .env file first (env vars still take precedence)
+    if ($RepoRoot) { Import-DotEnv -RepoRoot $RepoRoot }
+
     # Defaults
     $config = @{
         Port           = 5000
