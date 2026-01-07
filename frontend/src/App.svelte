@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Sidebar from './lib/components/Sidebar.svelte';
   import Topbar from './lib/components/Topbar.svelte';
+  import MobileNav from './lib/components/MobileNav.svelte';
   import Overview from './routes/Overview.svelte';
   import Parser from './routes/Parser.svelte';
   import Activity from './routes/Activity.svelte';
@@ -67,10 +68,10 @@
 
 <div class="app-shell">
   <Sidebar />
-  
+
   <main class="main">
     <Topbar onRefresh={handleRefresh} />
-    
+
     <div class="content">
       {#key uiStore.activeSection}
         <div class="page">
@@ -85,6 +86,9 @@
       {/key}
     </div>
   </main>
+
+  <!-- Mobile bottom navigation -->
+  <MobileNav />
 </div>
 
 <Notification />
@@ -93,6 +97,7 @@
   .app-shell {
     display: flex;
     min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
   }
 
   .main {
@@ -107,6 +112,7 @@
     flex: 1;
     padding: var(--space-xl) var(--space-2xl);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .page {
@@ -114,13 +120,35 @@
     margin: 0 auto;
   }
 
-  @media (max-width: 768px) {
+  /* Tablet breakpoint */
+  @media (max-width: 1023px) {
+    .content {
+      padding: var(--space-lg) var(--space-xl);
+    }
+  }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
     .app-shell {
       flex-direction: column;
     }
 
+    .main {
+      /* Account for bottom navigation */
+      padding-bottom: calc(var(--mobile-nav-height) + var(--safe-area-bottom));
+    }
+
     .content {
-      padding: var(--space-lg);
+      padding: var(--space-md);
+      padding-bottom: var(--space-lg);
+    }
+  }
+
+  /* Small mobile breakpoint */
+  @media (max-width: 479px) {
+    .content {
+      padding: var(--space-sm);
+      padding-bottom: var(--space-md);
     }
   }
 </style>

@@ -489,21 +489,131 @@
     color: var(--text-muted);
   }
 
-  @media (max-width: 640px) {
+  /* Tablet breakpoint */
+  @media (max-width: 1023px) {
+    .mode-selector {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    .mode-selector {
+      grid-template-columns: 1fr;
+      gap: var(--space-sm);
+    }
+
+    .mode-option {
+      padding: var(--space-md);
+    }
+
+    .mode-name {
+      font-size: 0.9375rem;
+    }
+
+    .mode-desc {
+      font-size: 0.8125rem;
+    }
+
     .tags-toolbar {
       flex-direction: column;
+      gap: var(--space-sm);
     }
 
     .tags-toolbar .input-group {
       max-width: none;
+      width: 100%;
+    }
+
+    .action-bar {
+      width: 100%;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .action-bar .btn {
+      flex: 1 1 calc(50% - var(--space-xs));
+      min-width: 120px;
+      justify-content: center;
+    }
+
+    .tags-grid {
+      gap: var(--space-xs);
+    }
+
+    .empty-tags {
+      padding: var(--space-lg);
+      font-size: 0.8125rem;
     }
 
     .parser-actions {
       flex-direction: column;
+      gap: var(--space-sm);
     }
 
     .parser-actions .btn {
       width: 100%;
+    }
+
+    /* Modal mobile adjustments */
+    .detect-toolbar {
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .detect-toolbar .btn-sm {
+      flex: 1 1 auto;
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    .detect-list {
+      max-height: 40vh;
+    }
+
+    .detect-item {
+      padding: var(--space-sm);
+      min-height: var(--touch-target-min);
+    }
+
+    .detect-item span {
+      font-size: 0.8125rem;
+    }
+
+    .write-description {
+      font-size: 0.8125rem;
+    }
+
+    .write-options {
+      gap: var(--space-sm);
+    }
+
+    .write-option {
+      padding: var(--space-md);
+    }
+
+    .write-option-title {
+      font-size: 0.9375rem;
+    }
+
+    .write-option-desc {
+      font-size: 0.75rem;
+    }
+  }
+
+  /* Small mobile breakpoint */
+  @media (max-width: 479px) {
+    .action-bar .btn {
+      flex: 1 1 100%;
+      min-width: 100%;
+    }
+
+    .mode-option {
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .mode-desc {
+      font-size: 0.75rem;
     }
   }
 </style>

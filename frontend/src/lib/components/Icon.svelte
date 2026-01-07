@@ -5,7 +5,7 @@
     class?: string;
   }
 
-  export type IconName = 
+  export type IconName =
     | 'home'
     | 'clock'
     | 'refresh'
@@ -28,7 +28,10 @@
     | 'error'
     | 'edit'
     | 'download'
-    | 'export';
+    | 'export'
+    | 'menu'
+    | 'chevronLeft'
+    | 'chevronRight';
 
   let { name, size = 16, class: className = '' }: Props = $props();
 </script>
@@ -120,6 +123,14 @@
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
     <polyline points="17 8 12 3 7 8"/>
     <line x1="12" y1="3" x2="12" y2="15"/>
+  {:else if name === 'menu'}
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <line x1="3" y1="12" x2="21" y2="12"/>
+    <line x1="3" y1="18" x2="21" y2="18"/>
+  {:else if name === 'chevronLeft'}
+    <path d="M15 18l-6-6 6-6"/>
+  {:else if name === 'chevronRight'}
+    <path d="M9 18l6-6-6-6"/>
   {/if}
 </svg>
 

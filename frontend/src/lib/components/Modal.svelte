@@ -86,4 +86,66 @@
   .modal-body--txt {
     color: #ffffff;
   }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    :global(.modal) {
+      padding: 0;
+      align-items: flex-end;
+    }
+
+    :global(.modal-panel) {
+      width: 100%;
+      max-width: 100%;
+      /* Leave generous room at top for browser URL bar (typically 56-76px) */
+      max-height: calc(100% - 76px);
+      margin-top: 76px;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      animation: slideUp var(--duration-normal) var(--ease-out);
+    }
+
+    :global(.modal-header) {
+      padding: var(--space-sm) var(--space-md);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    :global(.modal-body) {
+      padding: var(--space-md);
+      padding-bottom: calc(var(--space-md) + var(--safe-area-bottom));
+    }
+
+    .modal-title {
+      font-size: 0.75rem;
+    }
+
+    .modal-title-group {
+      gap: var(--space-xs);
+    }
+
+    :global(.modal-actions) .btn {
+      padding: 0.5rem;
+    }
+
+    :global(.modal-actions) .btn span {
+      display: none;
+    }
+  }
+
+  /* Small mobile - full screen modal */
+  @media (max-width: 479px) {
+    :global(.modal-panel) {
+      /* Full height but with top margin to clear browser URL bar */
+      max-height: calc(100% - 56px);
+      margin-top: 56px;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    }
+
+    :global(.modal-header) {
+      /* Add safe area padding for notched devices */
+      padding-top: calc(var(--space-sm) + var(--safe-area-top));
+      min-height: 48px;
+    }
+  }
 </style>

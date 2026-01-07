@@ -1007,9 +1007,16 @@ def create_app() -> Flask:
                     for m in re.finditer(r"<\s*([^<>/]+?)\s*>", system_content, re.IGNORECASE):
                         tag_name = m.group(1).strip()
                         base_name = tag_name.split()[0].lower()
-                        if base_name and base_name not in skip_tags:
+                        # Skip system/scenario/etc tags
+                        if not base_name or base_name in skip_tags:
+                            continue
+                        # Handle "[Name]'s Persona" pattern - extract just the name
+                        persona_match = re.match(r"^(.+?)'s\s+persona$", tag_name, re.IGNORECASE)
+                        if persona_match:
+                            char_name = persona_match.group(1).strip()
+                        else:
                             char_name = tag_name
-                            break
+                        break
 
                     # Extract scenario content
                     scenario_content = ""

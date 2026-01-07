@@ -218,7 +218,7 @@
   .metrics-grid > :global(*:nth-child(3)) { animation-delay: 0.15s; }
   .metrics-grid > :global(*:nth-child(4)) { animation-delay: 0.2s; }
 
-  /* Config cards from Setup */
+  /* Config cards */
   .config-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -242,6 +242,7 @@
     align-items: baseline;
     justify-content: space-between;
     margin-bottom: var(--space-md);
+    gap: var(--space-sm);
   }
 
   .config-label {
@@ -253,6 +254,7 @@
   .config-hint {
     font-size: 0.75rem;
     color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   .config-row {
@@ -262,9 +264,10 @@
 
   .config-row .input {
     flex: 1;
+    min-width: 0;
   }
 
-  /* Steps list from Setup */
+  /* Steps list */
   .steps {
     list-style: none;
     counter-reset: step-counter;
@@ -298,6 +301,7 @@
   .step-content {
     flex: 1;
     padding-top: 2px;
+    min-width: 0;
   }
 
   .step-content p {
@@ -318,6 +322,7 @@
     font-family: 'Geist Mono', monospace;
     font-size: 0.8125rem;
     color: var(--accent);
+    word-break: break-all;
   }
 
   .step-content a {
@@ -344,6 +349,7 @@
     font-weight: 500;
     cursor: pointer;
     transition: color var(--duration-fast), background-color var(--duration-fast);
+    -webkit-tap-highlight-color: transparent;
   }
 
   .help-trigger:hover {
@@ -364,13 +370,119 @@
     font-size: 0.8125rem;
   }
 
-  @media (max-width: 640px) {
+  /* Tablet breakpoint */
+  @media (max-width: 1023px) {
     .metrics-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-md);
     }
 
     .config-grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    .metrics-grid {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      gap: var(--space-md);
+      margin-left: calc(-1 * var(--space-md));
+      margin-right: calc(-1 * var(--space-md));
+      padding-left: var(--space-md);
+      padding-right: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .metrics-grid::-webkit-scrollbar {
+      display: none;
+    }
+
+    .metrics-grid > :global(*) {
+      scroll-snap-align: start;
+      flex: 0 0 75%;
+      min-width: 220px;
+      max-width: 280px;
+    }
+
+    .config-card {
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+    }
+
+    .config-label {
+      font-size: 0.875rem;
+    }
+
+    .config-row {
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .config-row .btn {
+      width: 100%;
+    }
+
+    .steps li {
+      gap: var(--space-sm);
+      padding: var(--space-md) 0;
+    }
+
+    .step-number {
+      width: 22px;
+      height: 22px;
+      font-size: 0.6875rem;
+    }
+
+    .step-content p {
+      font-size: 0.875rem;
+    }
+
+    .step-content code {
+      font-size: 0.75rem;
+      padding: 2px 4px;
+    }
+
+    .help-trigger {
+      margin-left: 0;
+      margin-top: var(--space-xs);
+      display: flex;
+      width: fit-content;
+    }
+  }
+
+  /* Small mobile breakpoint */
+  @media (max-width: 479px) {
+    .metrics-grid > :global(*) {
+      flex: 0 0 85%;
+      min-width: 200px;
+    }
+
+    .config-card {
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .config-header {
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-sm);
+    }
+
+    .step-content p {
+      font-size: 0.8125rem;
+    }
+
+    .help-card {
+      padding: var(--space-xs) var(--space-sm);
+    }
+
+    .help-card p {
+      font-size: 0.75rem;
     }
   }
 </style>

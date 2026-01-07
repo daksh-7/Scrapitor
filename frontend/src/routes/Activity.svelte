@@ -315,15 +315,15 @@
   <Section id="logs">
     <div class="logs-header">
       <div class="input-group">
-        <input 
-          class="input" 
-          placeholder="Filter logs..." 
+        <input
+          class="input"
+          placeholder="Filter logs..."
           aria-label="Filter logs by name"
           bind:value={filterText}
         />
-        <button class="btn" onclick={() => logsStore.refresh()}>
+        <button class="btn btn-icon-mobile" onclick={() => logsStore.refresh()} title="Refresh">
           <Icon name="refresh" size={14} />
-          Refresh
+          <span class="btn-label">Refresh</span>
         </button>
       </div>
       
@@ -562,6 +562,7 @@
     padding: var(--space-sm);
     max-height: min(60vh, 600px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .empty-state {
@@ -645,7 +646,7 @@
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
-    transition: 
+    transition:
       border-color var(--duration-fast),
       background-color var(--duration-fast);
   }
@@ -705,6 +706,9 @@
   .version-name {
     font-size: 0.8125rem;
     color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .version-meta {
@@ -764,10 +768,11 @@
     color: var(--text-muted);
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: 
+    transition:
       color var(--duration-fast),
       background-color var(--duration-fast);
     flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .version-action-btn:hover {
@@ -783,14 +788,303 @@
     opacity: 1;
   }
 
-  @media (max-width: 640px) {
-    .logs-header .input-group {
-      max-width: none;
+  /* ═══════════════════════════════════════════════════════════
+     Mobile Optimizations
+     ═══════════════════════════════════════════════════════════ */
+
+  /* Tablet breakpoint */
+  @media (max-width: 1023px) {
+    .logs-container {
+      max-height: min(55vh, 500px);
+    }
+  }
+
+  /* Mobile breakpoint */
+  @media (max-width: 767px) {
+    /* Header - full width stacked layout */
+    .logs-header {
+      gap: var(--space-md);
     }
 
+    .logs-header .input-group {
+      max-width: none;
+      width: 100%;
+    }
+
+    .logs-header .input-group .input {
+      flex: 1;
+    }
+
+    .logs-header .input-group .btn {
+      flex-shrink: 0;
+      padding: 0 var(--space-md);
+    }
+
+    /* Hide button label on mobile */
+    .btn-icon-mobile .btn-label {
+      display: none;
+    }
+
+    /* Actions area */
+    .logs-actions {
+      justify-content: stretch;
+      width: 100%;
+    }
+
+    .logs-actions > .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Selection bar - redesigned for mobile */
     .selection-bar {
       width: 100%;
-      justify-content: flex-start;
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-sm);
+      gap: var(--space-sm);
+    }
+
+    .selection-count {
+      font-size: 0.8125rem;
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      flex-shrink: 0;
+    }
+
+    .selection-bar .btn-sm {
+      flex: 1;
+      min-height: 40px;
+      padding: var(--space-sm) var(--space-md);
+      font-size: 0.75rem;
+      justify-content: center;
+      border-radius: var(--radius-md);
+    }
+
+    /* Logs container - maximize space */
+    .logs-container {
+      max-height: none;
+      height: auto;
+      flex: 1;
+      padding: var(--space-xs);
+      border-radius: var(--radius-lg);
+      margin: 0 calc(-1 * var(--space-md));
+      width: calc(100% + var(--space-md) * 2);
+      border-left: none;
+      border-right: none;
+      border-radius: 0;
+    }
+
+    /* Empty state */
+    .empty-state {
+      padding: var(--space-2xl) var(--space-lg);
+    }
+
+    .empty-state :global(.empty-icon) {
+      width: 56px;
+      height: 56px;
+    }
+
+    .empty-title {
+      font-size: 1rem;
+    }
+
+    .empty-description {
+      font-size: 0.8125rem;
+      max-width: 260px;
+    }
+
+    .truncation-notice {
+      font-size: 0.75rem;
+      padding: var(--space-md);
+    }
+
+    /* ── Version Picker Modal ─────────────────────────────── */
+    .version-picker {
+      padding-bottom: var(--space-md);
+    }
+
+    .version-toolbar {
+      gap: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-md);
+    }
+
+    .version-header {
+      font-size: 0.875rem;
+      width: 100%;
+      margin-bottom: var(--space-xs);
+    }
+
+    .version-toolbar .btn-sm {
+      flex: 1;
+      min-height: 40px;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+
+    .version-toolbar .selection-count {
+      width: 100%;
+      text-align: center;
+      margin-bottom: var(--space-xs);
+    }
+
+    .version-list {
+      gap: var(--space-sm);
+    }
+
+    .version-item {
+      padding: var(--space-md);
+      border-radius: var(--radius-lg);
+      min-height: 56px;
+      gap: var(--space-md);
+    }
+
+    .version-item:active {
+      transform: scale(0.98);
+    }
+
+    .version-content {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .version-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+      max-width: 100%;
+    }
+
+    .version-meta {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+    }
+
+    .version-action-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      background: var(--bg-hover);
+      opacity: 1;
+    }
+
+    .version-action-btn--hover {
+      opacity: 1;
+    }
+
+    .version-action-btn:active {
+      background: var(--bg-active);
+    }
+
+    /* Selecting mode */
+    .version-select-wrapper {
+      gap: var(--space-md);
+      min-height: 40px;
+    }
+
+    .version-select-wrapper input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--accent);
+    }
+
+    .version-select-wrapper .version-name {
+      flex: 1;
+    }
+
+    .version-select-wrapper .version-meta {
+      display: none;
+    }
+
+    /* Rename mode */
+    .version-rename-wrapper {
+      flex: 1;
+    }
+
+    .version-rename-input {
+      font-size: 16px;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-md);
+      min-height: 40px;
+    }
+
+    .version-rename-ext {
+      font-size: 0.875rem;
+      padding-left: var(--space-xs);
+    }
+
+    .version-actions {
+      gap: var(--space-sm);
+    }
+  }
+
+  /* Small mobile breakpoint */
+  @media (max-width: 479px) {
+    /* Selection bar - stack buttons */
+    .selection-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .selection-count {
+      order: -1;
+      text-align: center;
+    }
+
+    .selection-bar .btn-sm {
+      width: 100%;
+    }
+
+    /* Logs container */
+    .logs-container {
+      margin: 0 calc(-1 * var(--space-sm));
+      width: calc(100% + var(--space-sm) * 2);
+    }
+
+    /* Empty state compact */
+    .empty-state {
+      padding: var(--space-xl) var(--space-md);
+    }
+
+    .empty-state :global(.empty-icon) {
+      width: 48px;
+      height: 48px;
+      margin-bottom: var(--space-md);
+    }
+
+    .empty-title {
+      font-size: 0.9375rem;
+    }
+
+    .empty-description {
+      font-size: 0.75rem;
+    }
+
+    /* Version picker compact */
+    .version-toolbar .btn-sm {
+      font-size: 0.6875rem;
+      padding: var(--space-sm);
+    }
+
+    .version-item {
+      padding: var(--space-sm) var(--space-md);
+      min-height: 52px;
+    }
+
+    .version-name {
+      font-size: 0.8125rem;
+    }
+
+    .version-meta {
+      font-size: 0.6875rem;
+    }
+
+    .version-action-btn {
+      width: 36px;
+      height: 36px;
     }
   }
 </style>
