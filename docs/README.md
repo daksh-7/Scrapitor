@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-1e3a8a?style=flat-square" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/Svelte-5-1d4ed8?style=flat-square" alt="Svelte 5">
-  <img src="https://img.shields.io/badge/Version-2.0-3b82f6?style=flat-square" alt="Version 2.0">
+  <img src="https://img.shields.io/badge/Version-2.2-3b82f6?style=flat-square" alt="Version 2.2">
   <img src="https://img.shields.io/badge/PRs-welcome-0ea5e9?style=flat-square" alt="PRs Welcome">
 </p>
 
@@ -147,6 +147,7 @@ The launcher will:
 
   ┌────────────────────────────────────────────────────────────────┐
   │  Dashboard:  http://localhost:5000                             │
+  │  LAN:        http://192.168.0.101:5000                         │
   │  Proxy URL:  https://example.trycloudflare.com/openrouter-cc   │
   └────────────────────────────────────────────────────────────────┘
 ```
@@ -188,7 +189,10 @@ cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 
 ## Web Dashboard
 
-Access the dashboard at `http://localhost:5000` (or your Cloudflare URL).
+Access the dashboard at:
+- **Localhost:** `http://localhost:5000` — from the same machine
+- **LAN:** `http://<your-ip>:5000` — from any device on your network (phones, tablets, other computers)
+- **Cloudflare:** Your tunnel URL — from anywhere on the internet
 
 ### Overview
 - **Metrics:** Request count, log files, parsed outputs, server port
