@@ -6,7 +6,7 @@
 
 ## Overview
 
-This release makes the WebUI fully mobile-compatible with a responsive design that adapts to any screen size. Also adds LAN access support and fixes character card export naming.
+This release makes the WebUI fully mobile-compatible with a responsive design that adapts to any screen size. Also adds LAN access support, `.env` file configuration, and fixes character card export naming.
 
 ---
 
@@ -52,6 +52,13 @@ The entire frontend has been redesigned to work seamlessly on mobile devices:
   - Displays LAN URL between localhost and Cloudflare tunnel URLs
   - Access dashboard from any device on the same network (phones, tablets, other computers)
   - Works on both Windows (PowerShell) and Docker deployments
+
+### Configuration
+
+- **`.env` File Support** — Create a `.env` file in the repo root to configure settings
+  - Supports all environment variables (`PROXY_PORT`, `OPENROUTER_API_KEY`, etc.)
+  - Environment variables still take precedence over `.env` values
+  - Works on both Windows (PowerShell) and direct Python execution
 
 ### Bug Fixes
 
