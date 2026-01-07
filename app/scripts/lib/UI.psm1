@@ -219,24 +219,61 @@ function Clear-SpinnerLine {
     Write-Host "`r" -NoNewline
 }
 
+function Get-LanIPAddress {
+    [CmdletBinding()]
+    param()
+
+    try {
+        # Get the first IPv4 address that's not loopback and is on an Up interface
+        $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.IPAddress -ne '127.0.0.1' -and
+                $_.PrefixOrigin -ne 'WellKnown' -and
+                (Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue).Status -eq 'Up'
+            } |
+            Select-Object -First 1 -ExpandProperty IPAddress
+
+        if ($ip) { return $ip }
+    }
+    catch { }
+
+    # Fallback: try socket method
+    try {
+        $socket = [System.Net.Sockets.Socket]::new([System.Net.Sockets.AddressFamily]::InterNetwork, [System.Net.Sockets.SocketType]::Dgram, 0)
+        $socket.Connect("8.8.8.8", 53)
+        $ip = ($socket.LocalEndPoint -as [System.Net.IPEndPoint]).Address.ToString()
+        $socket.Close()
+        return $ip
+    }
+    catch { }
+
+    return $null
+}
+
 function Show-UrlBox {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$TunnelUrl,
         [Parameter(Mandatory)][int]$Port
     )
-    
+
     # Ensure capabilities are initialized
     if (-not $script:Capabilities.Initialized) { Initialize-TerminalCapabilities }
-    
+
     $proxyUrl = "$TunnelUrl/openrouter-cc"
     $localUrl = "http://localhost:$Port"
-    
+    $lanIp = Get-LanIPAddress
+    $lanUrl = if ($lanIp) { "http://${lanIp}:$Port" } else { $null }
+
     # Calculate box width based on longest content (no cap - URLs must be fully visible)
     $dashboardLine = "  Dashboard:  $localUrl"
+    $lanLine = if ($lanUrl) { "  LAN:        $lanUrl" } else { $null }
     $proxyLine = "  Proxy URL:  $proxyUrl"
-    $innerWidth = [Math]::Max($dashboardLine.Length, $proxyLine.Length) + 2
-    
+
+    $innerWidth = [Math]::Max($dashboardLine.Length, $proxyLine.Length)
+    if ($lanLine) { $innerWidth = [Math]::Max($innerWidth, $lanLine.Length) }
+    $innerWidth += 2
+
     # Box characters
     $tl = $script:BoxChars.TopLeft
     $tr = $script:BoxChars.TopRight
@@ -244,31 +281,40 @@ function Show-UrlBox {
     $br = $script:BoxChars.BottomRight
     $hz = $script:BoxChars.Horizontal
     $vt = $script:BoxChars.Vertical
-    
+
     $indent = " " * $script:Layout.Indent
     $topBot = $hz * $innerWidth
-    
+
     Write-Host ""
     # Top border
     Write-Host "$indent$tl$topBot$tr" -ForegroundColor $script:Theme.Muted
-    
-    # Dashboard line
+
+    # Dashboard line (localhost)
     Write-Host "$indent$vt" -ForegroundColor $script:Theme.Muted -NoNewline
     Write-Host "  Dashboard:  " -NoNewline
     Write-Host $localUrl -ForegroundColor $script:Theme.Primary -NoNewline
     Write-Host (" " * ($innerWidth - $dashboardLine.Length)) -NoNewline
     Write-Host "$vt" -ForegroundColor $script:Theme.Muted
-    
+
+    # LAN line (if available)
+    if ($lanUrl) {
+        Write-Host "$indent$vt" -ForegroundColor $script:Theme.Muted -NoNewline
+        Write-Host "  LAN:        " -NoNewline
+        Write-Host $lanUrl -ForegroundColor $script:Theme.Primary -NoNewline
+        Write-Host (" " * ($innerWidth - $lanLine.Length)) -NoNewline
+        Write-Host "$vt" -ForegroundColor $script:Theme.Muted
+    }
+
     # Proxy URL line (emphasized)
     Write-Host "$indent$vt" -ForegroundColor $script:Theme.Muted -NoNewline
     Write-Host "  Proxy URL:  " -NoNewline
     Write-Host $proxyUrl -ForegroundColor $script:Theme.Success -NoNewline
     Write-Host (" " * ($innerWidth - $proxyLine.Length)) -NoNewline
     Write-Host "$vt" -ForegroundColor $script:Theme.Muted
-    
+
     # Bottom border
     Write-Host "$indent$bl$topBot$br" -ForegroundColor $script:Theme.Muted
-    
+
     # Hint
     Write-Host ""
     Write-Host "$indent  Copy the Proxy URL and paste it into JanitorAI" -ForegroundColor $script:Theme.Muted
