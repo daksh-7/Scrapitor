@@ -23,6 +23,42 @@ except ImportError:
     from parser.parser import _compile_tag_pair, _remove_tag_blocks
 
 
+# ── .env loader ──────────────────────────────────────────────
+def _load_dotenv() -> None:
+    """Load .env file from repo root if it exists. Env vars take precedence."""
+    # Find repo root (parent of app/)
+    app_dir = pathlib.Path(__file__).parent.resolve()
+    repo_root = app_dir.parent
+    env_file = repo_root / '.env'
+
+    if not env_file.exists():
+        return
+
+    try:
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith('#'):
+                    continue
+                # Parse KEY=VALUE
+                if '=' in line:
+                    key, _, value = line.partition('=')
+                    key = key.strip()
+                    value = value.strip()
+                    # Remove surrounding quotes
+                    if (value.startswith('"') and value.endswith('"')) or \
+                       (value.startswith("'") and value.endswith("'")):
+                        value = value[1:-1]
+                    # Only set if not already defined
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+    except Exception:
+        pass
+
+# Load .env before building config
+_load_dotenv()
+
 # ── config ───────────────────────────────────────────────────
 def _load_config() -> Dict[str, Any]:
     def env(k, default, cast=str):
