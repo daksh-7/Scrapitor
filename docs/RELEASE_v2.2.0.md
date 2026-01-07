@@ -6,7 +6,7 @@
 
 ## Overview
 
-This release makes the WebUI fully mobile-compatible with a responsive design that adapts to any screen size. Also includes a fix for character card export naming.
+This release makes the WebUI fully mobile-compatible with a responsive design that adapts to any screen size. Also adds LAN access support and fixes character card export naming.
 
 ---
 
@@ -44,6 +44,14 @@ The entire frontend has been redesigned to work seamlessly on mobile devices:
   - Media query breakpoints at 767px for mobile/desktop split
   - Touch-optimized tap highlights and interactions
   - Viewport meta tag with `viewport-fit=cover` for edge-to-edge display
+
+### LAN Access Support
+
+- **Network-wide Dashboard Access** — Dashboard URL now displayed for LAN access
+  - Automatically detects local network IP address
+  - Displays LAN URL between localhost and Cloudflare tunnel URLs
+  - Access dashboard from any device on the same network (phones, tablets, other computers)
+  - Works on both Windows (PowerShell) and Docker deployments
 
 ### Bug Fixes
 

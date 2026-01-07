@@ -162,6 +162,11 @@ log ""
 log "JanitorAI API URL: $URL/openrouter-cc"
 log "Dashboard URL (Cloudflare): $URL"
 log "Dashboard URL (Local): http://localhost:$PORT"
+# Try to get container's LAN IP for Docker host access
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+if [ -n "$LAN_IP" ] && [ "$LAN_IP" != "127.0.0.1" ]; then
+  log "Dashboard URL (LAN): http://$LAN_IP:$PORT"
+fi
 log ""
 log "Press Ctrl+C to stop the server when finished"
 
