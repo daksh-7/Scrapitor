@@ -13,7 +13,7 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
-from flask import Flask, Response, jsonify, request, stream_with_context, render_template, send_from_directory
+from flask import Flask, Response, jsonify, request, stream_with_context, send_from_directory
 from flask_cors import CORS
 
 # Import tag utilities from parser (handles both module and direct execution)
@@ -147,16 +147,6 @@ def _load_parser_settings() -> Dict[str, Any]:
         if _PARSER_SETTINGS_PATH.exists():
             disk = json.loads(_PARSER_SETTINGS_PATH.read_text(encoding="utf-8"))
             if isinstance(disk, dict):
-                # Backward compatibility mapping
-                if "mode" in disk and "tags" in disk and ("include_tags" not in disk and "exclude_tags" not in disk):
-                    old_mode = str(disk.get("mode", "keep_all")).lower()
-                    tags = list(disk.get("tags", []))
-                    if old_mode == "include":
-                        disk["mode"] = "custom"; disk["include_tags"] = tags; disk["exclude_tags"] = []
-                    elif old_mode == "omit":
-                        disk["mode"] = "custom"; disk["exclude_tags"] = tags; disk["include_tags"] = []
-                    else:
-                        disk["mode"] = "default"; disk["include_tags"] = []; disk["exclude_tags"] = []
                 if "preset" in disk or "omit_tags" in disk or "include_tags" in disk:
                     preset = str(disk.get("preset", "default")).lower()
                     if preset == "default":
@@ -430,7 +420,7 @@ def _stream_back(payload: dict, headers: dict):
 
 # ── app ──────────────────────────────────────────────────────
 def create_app() -> Flask:
-    app = Flask(__name__, static_folder='static', template_folder='templates', static_url_path='/static')
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
     # Honor X-Forwarded-* headers from cloudflared so url_for and request.url_root are correct
     try:
         from werkzeug.middleware.proxy_fix import ProxyFix
@@ -1209,73 +1199,26 @@ def create_app() -> Flask:
             "config": {"port": LISTEN_PORT},
         })
 
-    # Static convenience routes for favicons/manifest at the site root
-    @app.route("/favicon.ico")
-    def favicon_root():
-        try:
-            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "favicon.ico")
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-        except Exception:
-            return "", 404
-
-    @app.route("/apple-touch-icon.png")
-    def apple_touch_icon_root():
-        try:
-            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "apple-touch-icon.png")
-            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return resp
-        except Exception:
-            return "", 404
-
-    @app.route("/site.webmanifest")
-    def webmanifest_root():
-        try:
-            resp = send_from_directory(pathlib.Path(app.static_folder) / "assets", "site.webmanifest")
-            resp.headers["Content-Type"] = "application/manifest+json"
-            resp.headers["Cache-Control"] = "public, max-age=604800"
-            return resp
-        except Exception:
-            return jsonify({"error": "manifest not found"}), 404
-
     return app
 
 app = create_app()
 
-# Check if SPA build exists
+# SPA build location
 _SPA_DIST = BASE_DIR / "static" / "dist"
-_SPA_EXISTS = _SPA_DIST.exists() and (_SPA_DIST / "index.html").exists()
-_USE_SPA = True  # FORCE SPA - set to _SPA_EXISTS to enable auto-detection
-
-if _USE_SPA and not _SPA_EXISTS:
-    log.warning(f"SPA forced but dist not found at {_SPA_DIST}")
-else:
-    log.info(f"Using {'Svelte SPA' if _USE_SPA else 'Legacy Jinja templates'}")
+if not (_SPA_DIST / "index.html").exists():
+    log.warning(f"SPA dist not found at {_SPA_DIST}")
 
 @app.route("/")
 def ui():
-    if _USE_SPA:
-        # Serve the Svelte SPA
-        return send_from_directory(_SPA_DIST, "index.html"), 200, {
-            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
-        }
-    # Fallback to Jinja templates (legacy)
-    html = render_template(
-        "index.html",
-        port=LISTEN_PORT,
-        max_messages=CONFIG["security"]["max_messages"],
-    )
-    return html, 200, {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+    return send_from_directory(_SPA_DIST, "index.html"), 200, {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+    }
 
-# Serve SPA assets
 @app.route("/assets/<path:filename>")
 def spa_assets(filename: str):
-    if _USE_SPA:
-        resp = send_from_directory(_SPA_DIST / "assets", filename)
-        # Cache built assets for 1 year (they have hashed filenames)
-        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        return resp
-    return "", 404
+    resp = send_from_directory(_SPA_DIST / "assets", filename)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 @app.errorhandler(500)

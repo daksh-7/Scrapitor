@@ -11,16 +11,7 @@ STATE_DIR="$VAR_DIR/state"
 LOGS_DIR="$VAR_DIR/logs"
 mkdir -p "$STATE_DIR" "$LOGS_DIR"
 
-# Resolve port from env or config.yaml
-PORT="${PROXY_PORT:-}"
-if [ -z "${PORT}" ] && [ -f "$APP_DIR/config.yaml" ]; then
-  # Look for port under server: block
-  port_line=$(awk '/^[[:space:]]*server:[[:space:]]*$/{flag=1;next} flag && /^[[:space:]]*port:[[:space:]]*[0-9]+/{print;flag=0}' "$APP_DIR/config.yaml" 2>/dev/null || true)
-  if [ -n "$port_line" ]; then
-    PORT=$(printf "%s" "$port_line" | sed -E 's/.*port:[[:space:]]*([0-9]+).*/\1/')
-  fi
-fi
-if [ -z "${PORT}" ]; then PORT=5000; fi
+PORT="${PROXY_PORT:-5000}"
 export PROXY_PORT="$PORT"
 
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-30}"

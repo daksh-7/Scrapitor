@@ -72,17 +72,6 @@ def _remove_tag_blocks(text: str, name: str) -> str:
     return text
 
 
-def _strip_tag_markers(text: str, name: str) -> str:
-    """Remove only the opening and closing tags for a given name, keep content.
-
-    Does not attempt nesting logic; simply strips <name ...> and </name> tags, case-insensitive.
-    """
-    open_re, close_re = _compile_tag_pair(name)
-    text = open_re.sub("", text)
-    text = close_re.sub("", text)
-    return text
-
-
 def _find_first_non_skipped_tag(text: str, skip_for_name: set[str]) -> Optional[Tuple[str, int, int]]:
     """Find first opening tag <...> whose name is not in SKIP_TAGS.
 

@@ -85,10 +85,6 @@ export interface RenameResponse {
   new: string;
 }
 
-export interface ErrorResponse {
-  error: string;
-}
-
 export interface SillyTavernExport {
   name: string;
   filename: string;
