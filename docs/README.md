@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/frontend/public/assets/logo.png" alt="Scrapitor Logo" width="180" height="180">
+  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo.svg" alt="Scrapitor Logo" width="180" height="180">
 </p>
 
 <h1 align="center">Scrapitor</h1>

@@ -59,7 +59,7 @@
   <div class="sidebar-header">
     <div class="brand" aria-label="Scrapitor - Local OpenRouter Gateway">
       <div class="logo">
-        <img src="/assets/logo.png" alt="" class="logo-img" />
+        <img src="/static/assets/logo.svg" alt="" class="logo-img" />
       </div>
       {#if !collapsed}
         <div class="brand-text">

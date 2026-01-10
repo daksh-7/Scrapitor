@@ -98,13 +98,7 @@ function Get-ScrapitorConfig {
             catch { }
         }
     }
-    
-    # Try loading port from config.yaml
-    if (-not (Get-EnvVar -Name 'PROXY_PORT')) {
-        $yamlPort = Get-PortFromYaml -AppRoot $AppRoot -RepoRoot $RepoRoot
-        if ($yamlPort) { $config.Port = $yamlPort }
-    }
-    
+
     # Compute paths
     $config.AppRoot = $AppRoot
     $config.RepoRoot = $RepoRoot
@@ -134,33 +128,6 @@ function Get-EnvVar {
         $value = [Environment]::GetEnvironmentVariable($Name, $scope)
         if ($value) { return $value }
     }
-    return $null
-}
-
-function Get-PortFromYaml {
-    [CmdletBinding()]
-    param(
-        [string]$AppRoot,
-        [string]$RepoRoot
-    )
-    
-    $candidates = @(
-        (Join-Path $AppRoot 'config.yaml'),
-        (Join-Path $RepoRoot 'config.yaml')
-    ) | Where-Object { $_ } | Select-Object -Unique
-    
-    foreach ($path in $candidates) {
-        if (Test-Path $path) {
-            try {
-                $yaml = Get-Content $path -Raw -ErrorAction Stop
-                if ($yaml -match '(?ms)server:\s*.*?\bport\s*:\s*(\d+)') {
-                    return [int]$matches[1]
-                }
-            }
-            catch { }
-        }
-    }
-    
     return $null
 }
 
