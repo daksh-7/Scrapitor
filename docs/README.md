@@ -320,7 +320,6 @@ python app/parser/parser.py --output-dir out --suffix v2 log.json
 Configuration can be set via:
 1. **Environment variables** (highest priority)
 2. **`.env` file** at the repo root
-3. **`config.yaml`** file (for port only)
 
 ### Example `.env` file
 
