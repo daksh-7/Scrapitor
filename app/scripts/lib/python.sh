@@ -123,6 +123,7 @@ test_venv_module_available() {
 
 # Detect package manager and install python venv package
 # Returns 0 on success, 1 on failure
+# NOTE: Uses sudo -n (non-interactive) to avoid password prompts that confuse the script flow
 install_venv_package() {
     local python_path="$1"
     
@@ -130,7 +131,7 @@ install_venv_package() {
     local py_version
     py_version=$("$python_path" -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
     
-    # Termux - use pkg
+    # Termux - use pkg (no sudo needed)
     if [[ -n "${TERMUX_VERSION:-}" ]] || [[ -d "/data/data/com.termux" ]]; then
         pkg install python -y &>/dev/null && return 0
         return 1
@@ -140,24 +141,26 @@ install_venv_package() {
     if command -v apt-get &>/dev/null; then
         local pkg_name="python${py_version}-venv"
         
-        # Try without sudo first (might be root or have permissions)
+        # Try without sudo first (might be root)
         if apt-get install -y "$pkg_name" &>/dev/null; then
             return 0
         fi
         
-        # Try with sudo
+        # Try with sudo -n (non-interactive, only works if credentials are cached)
+        # This avoids password prompts that break the script flow
         if command -v sudo &>/dev/null; then
-            if sudo apt-get install -y "$pkg_name" &>/dev/null; then
+            if sudo -n apt-get install -y "$pkg_name" &>/dev/null; then
                 return 0
             fi
         fi
         
+        # Can't auto-install without password - let user do it manually
         return 1
     fi
     
-    # Fedora/RHEL - venv is included, but try anyway
+    # Fedora/RHEL - try non-interactive sudo
     if command -v dnf &>/dev/null; then
-        if sudo dnf install -y python3-libs &>/dev/null; then
+        if sudo -n dnf install -y python3-libs &>/dev/null; then
             return 0
         fi
         return 1
@@ -202,7 +205,7 @@ create_python_venv() {
     
     # Check if venv module is available, try to install if not
     if ! test_venv_module_available "$python_path"; then
-        # Try auto-installing the venv package
+        # Try auto-installing the venv package (non-interactive)
         if ! install_venv_package "$python_path"; then
             local hint
             hint=$(get_venv_install_hint "$python_path")
@@ -217,6 +220,11 @@ create_python_venv() {
             echo "Python venv module still not available after install attempt. Try manually: ${hint}" >&2
             return 1
         fi
+    fi
+    
+    # Remove any existing broken venv directory
+    if [[ -d "$venv_path" ]]; then
+        rm -rf "$venv_path" 2>/dev/null || true
     fi
     
     local output

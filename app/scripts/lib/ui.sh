@@ -9,13 +9,14 @@ UI_WIDTH=80
 UI_INITIALIZED=false
 
 # ── Colors (ANSI escape codes) ────────────────────────────────────────────────
-COLOR_RESET="\033[0m"
-COLOR_CYAN="\033[36m"
-COLOR_GREEN="\033[32m"
-COLOR_YELLOW="\033[33m"
-COLOR_RED="\033[31m"
-COLOR_GRAY="\033[90m"
-COLOR_MAGENTA="\033[35m"
+# Use $'...' syntax so escape codes are interpreted immediately
+COLOR_RESET=$'\033[0m'
+COLOR_CYAN=$'\033[36m'
+COLOR_GREEN=$'\033[32m'
+COLOR_YELLOW=$'\033[33m'
+COLOR_RED=$'\033[31m'
+COLOR_GRAY=$'\033[90m'
+COLOR_MAGENTA=$'\033[35m'
 
 # ── Icons ─────────────────────────────────────────────────────────────────────
 ICON_SUCCESS="+"
