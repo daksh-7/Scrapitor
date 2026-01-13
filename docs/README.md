@@ -57,20 +57,14 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 
 ### Quick Start (Linux/macOS)
 
-1. Download and extract, or clone with git:
+1. Clone and run:
 
 ```bash
-git clone https://github.com/daksh-7/scrapitor
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor && ./run.sh
 ```
 
-2. Run the launcher:
-
-```bash
-cd scrapitor && ./run.sh
-```
-
-3. Copy the Cloudflare Proxy URL from the terminal
-4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
+2. Copy the Cloudflare Proxy URL from the terminal
+3. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
 
 **Requirements:** Python 3.10+, curl, and bash. The launcher auto-installs cloudflared and Python dependencies.
 
@@ -81,21 +75,13 @@ cd scrapitor && ./run.sh
 2. Install dependencies:
 
 ```bash
-pkg update && pkg upgrade -y
-```
-
-```bash
-pkg install python git curl cloudflared -y
+pkg update && pkg upgrade -y && pkg install python git curl cloudflared -y
 ```
 
 3. Clone and run:
 
 ```bash
-git clone https://github.com/daksh-7/scrapitor
-```
-
-```bash
-cd scrapitor && chmod +x run.sh && ./run.sh
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor && ./run.sh
 ```
 
 4. In another Termux session, run `termux-wake-lock` to prevent Android from killing the process
@@ -174,11 +160,7 @@ graph LR
 **Option B:** Clone with Git:
 
 ```powershell
-git clone https://github.com/daksh-7/scrapitor
-```
-
-```powershell
-cd scrapitor
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor
 ```
 
 **Then:** Double-click `run.bat`
@@ -232,17 +214,7 @@ The launcher will:
 **Option B:** Clone with Git:
 
 ```bash
-git clone https://github.com/daksh-7/scrapitor
-```
-
-```bash
-cd scrapitor
-```
-
-**Then:** Run the launcher:
-
-```bash
-chmod +x run.sh && ./run.sh
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor && ./run.sh
 ```
 
 The launcher will:
@@ -260,19 +232,7 @@ The launcher will:
 **Manual Setup (alternative):**
 
 ```bash
-python3 -m venv app/.venv
-```
-
-```bash
-source app/.venv/bin/activate
-```
-
-```bash
-pip install -r app/requirements.txt
-```
-
-```bash
-python -m app.server
+python3 -m venv app/.venv && source app/.venv/bin/activate && pip install -r app/requirements.txt && python -m app.server
 ```
 
 In another terminal (optional):
@@ -300,19 +260,8 @@ Run scrapitor directly on your Android device using Termux.
 **Install:**
 
 ```bash
-pkg update && pkg upgrade -y
-```
-
-```bash
-pkg install python git curl cloudflared -y
-```
-
-```bash
-git clone https://github.com/daksh-7/scrapitor
-```
-
-```bash
-cd scrapitor && chmod +x run.sh && ./run.sh
+pkg update && pkg upgrade -y && pkg install python git curl cloudflared -y
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor && ./run.sh
 ```
 
 The launcher will:
@@ -326,32 +275,17 @@ The launcher will:
 
 Android aggressively kills background apps to save battery. To keep scrapitor running:
 
-Option 1 (recommended): Run in a separate Termux session:
-
 ```bash
-termux-wake-lock
+termux-wake-lock          # Option 1 (recommended): Run in separate session
+pkg install termux-services  # Option 2: Install termux-services
+# Option 3: Disable battery optimization for Termux in Android settings
 ```
-
-Option 2: Install termux-services:
-
-```bash
-pkg install termux-services
-```
-
-Option 3: Disable battery optimization for Termux in Android settings
 
 **Optional packages:**
 
-For frontend building (large download, ~200MB):
-
 ```bash
-pkg install nodejs
-```
-
-For better LAN IP detection:
-
-```bash
-pkg install net-tools iproute2
+pkg install nodejs           # For frontend building (~200MB)
+pkg install net-tools iproute2  # For better LAN IP detection
 ```
 
 **Tips for Termux:**
@@ -564,34 +498,12 @@ Cross-platform containerized deployment using Docker Compose. Ideal for servers,
 
 ### Quick Start
 
-Build and start all services (foreground):
-
 ```bash
-docker compose up --build
-```
-
-Build and start in background (detached):
-
-```bash
-docker compose up -d --build
-```
-
-View live logs:
-
-```bash
-docker compose logs -f
-```
-
-Stop all services:
-
-```bash
-docker compose down
-```
-
-Stop and remove volumes (clean slate):
-
-```bash
-docker compose down -v
+docker compose up --build       # Build and start (foreground)
+docker compose up -d --build    # Build and start (detached)
+docker compose logs -f          # View live logs
+docker compose down             # Stop all services
+docker compose down -v          # Stop and remove volumes (clean slate)
 ```
 
 ### Services
@@ -621,46 +533,14 @@ All environment variables from the [Configuration](#configuration) section are s
 
 ### Common Commands
 
-Start proxy only (no tunnel):
-
 ```bash
-docker compose up --build proxy
-```
-
-View proxy logs only:
-
-```bash
-docker compose logs -f proxy
-```
-
-View tunnel logs only:
-
-```bash
-docker compose logs -f tunnel
-```
-
-Rebuild after code changes:
-
-```bash
-docker compose up --build --force-recreate
-```
-
-Check service status:
-
-```bash
-docker compose ps
-```
-
-Execute command in running container:
-
-```bash
-docker compose exec proxy python -c "print('hello')"
-```
-
-View resource usage:
-
-```bash
-docker compose stats
+docker compose up --build proxy              # Start proxy only (no tunnel)
+docker compose logs -f proxy                 # View proxy logs only
+docker compose logs -f tunnel                # View tunnel logs only
+docker compose up --build --force-recreate   # Rebuild after code changes
+docker compose ps                            # Check service status
+docker compose exec proxy python -c "..."    # Execute command in container
+docker compose stats                         # View resource usage
 ```
 
 ### Persistent Data
@@ -760,53 +640,22 @@ python -m venv app/.venv
 Activate and install (Windows):
 
 ```powershell
-app\.venv\Scripts\pip install -r app/requirements.txt
-```
-
-```powershell
-app\.venv\Scripts\python -m app.server
+app\.venv\Scripts\pip install -r app/requirements.txt && app\.venv\Scripts\python -m app.server
 ```
 
 Activate and install (Linux/macOS):
 
 ```bash
-source app/.venv/bin/activate
-```
-
-```bash
-pip install -r app/requirements.txt
-```
-
-```bash
-python -m app.server
+source app/.venv/bin/activate && pip install -r app/requirements.txt && python -m app.server
 ```
 
 ### Frontend
 
 ```bash
-cd frontend
-```
-
-```bash
-npm install
-```
-
-Dev server with hot reload (port 5173):
-
-```bash
-npm run dev
-```
-
-Production build:
-
-```bash
-npm run build
-```
-
-Type check:
-
-```bash
-npm run check
+cd frontend && npm install
+npm run dev     # Dev server with hot reload (port 5173)
+npm run build   # Production build
+npm run check   # Type check
 ```
 
 ### Project Structure
