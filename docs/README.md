@@ -48,6 +48,7 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 2. Install dependencies and clone:
 ```bash
 pkg update && pkg install python git curl cloudflared
+pkg install cloudflared
 git clone https://github.com/daksh-7/scrapitor && cd scrapitor
 chmod +x run.sh && ./run.sh
 ```
