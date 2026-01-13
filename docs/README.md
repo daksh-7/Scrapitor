@@ -19,52 +19,12 @@
 
 A local proxy that intercepts JanitorAI traffic, captures request payloads as JSON logs, and provides a rule-driven parser to extract clean character sheets. Exports to SillyTavern-compatible JSON format.
 
-## Quick Start (Windows)
-
-1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
-2. Double-click `run.bat`
-3. Copy the Cloudflare Proxy URL from the terminal
-4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
-5. Send a message — your request appears in the dashboard Activity tab
-
-**Requirements:** Python 3.10+ and PowerShell 7. The launcher auto-installs everything else.
-
-## Quick Start (Linux/macOS)
-
-1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
-2. Run the launcher:
-```bash
-./run.sh
-```
-3. Copy the Cloudflare Proxy URL from the terminal
-4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
-5. Send a message — your request appears in the dashboard Activity tab
-
-**Requirements:** Python 3.10+, curl, and bash. The launcher auto-installs cloudflared and Python dependencies.
-
-## Quick Start (Termux/Android)
-
-1. Install Termux from [F-Droid](https://f-droid.org/en/packages/com.termux/) (not Play Store — it's outdated)
-2. Install dependencies and clone:
-```bash
-pkg update && pkg install python git curl cloudflared
-pkg install cloudflared
-git clone https://github.com/daksh-7/scrapitor && cd scrapitor
-chmod +x run.sh && ./run.sh
-```
-3. In another Termux session, run `termux-wake-lock` to prevent Android from killing the process
-4. Copy the Cloudflare Proxy URL from the terminal
-5. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
-
-**Requirements:** Termux with python, curl, git, and cloudflared packages. ARM64 device required (most modern Android phones).
-
----
-
 ## Table of Contents
 
-- [Quick Start (Windows)](#quick-start-windows)
-- [Quick Start (Linux/macOS)](#quick-start-linuxmacos)
-- [Quick Start (Termux/Android)](#quick-start-termuxandroid)
+- [Quick Start](#quick-start)
+  - [Windows](#quick-start-windows)
+  - [Linux/macOS](#quick-start-linuxmacos)
+  - [Termux/Android](#quick-start-termuxandroid)
 - [Architecture](#architecture)
 - [Installation](#installation)
   - [Windows](#windows-recommended)
@@ -80,6 +40,68 @@ chmod +x run.sh && ./run.sh
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Notes](#notes)
+
+---
+
+## Quick Start
+
+### Quick Start (Windows)
+
+1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
+2. Double-click `run.bat`
+3. Copy the Cloudflare Proxy URL from the terminal
+4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
+5. Send a message — your request appears in the dashboard Activity tab
+
+**Requirements:** Python 3.10+ and PowerShell 7. The launcher auto-installs everything else.
+
+### Quick Start (Linux/macOS)
+
+1. Download and extract, or clone with git:
+
+```bash
+git clone https://github.com/daksh-7/scrapitor
+```
+
+2. Run the launcher:
+
+```bash
+cd scrapitor && ./run.sh
+```
+
+3. Copy the Cloudflare Proxy URL from the terminal
+4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
+
+**Requirements:** Python 3.10+, curl, and bash. The launcher auto-installs cloudflared and Python dependencies.
+
+### Quick Start (Termux/Android)
+
+1. Install [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/) (Play Store version is outdated)
+
+2. Install dependencies:
+
+```bash
+pkg update && pkg upgrade -y
+```
+
+```bash
+pkg install python git curl cloudflared -y
+```
+
+3. Clone and run:
+
+```bash
+git clone https://github.com/daksh-7/scrapitor
+```
+
+```bash
+cd scrapitor && chmod +x run.sh && ./run.sh
+```
+
+4. In another Termux session, run `termux-wake-lock` to prevent Android from killing the process
+5. Copy the Cloudflare Proxy URL and use it in JanitorAI
+
+**Requirements:** Termux with python, curl, git, and cloudflared packages. ARM64 device required.
 
 ---
 
@@ -147,12 +169,15 @@ graph LR
 - Python 3.10+ ([Download](https://www.python.org/downloads/) — check "Add python.exe to PATH")
 - PowerShell 7: `winget install Microsoft.PowerShell`
 
-**Install:**
-```powershell
-# Option A: Download ZIP from GitHub and unzip
+**Option A:** Download ZIP from GitHub → Code → Download ZIP → Unzip
 
-# Option B: Clone with Git
+**Option B:** Clone with Git:
+
+```powershell
 git clone https://github.com/daksh-7/scrapitor
+```
+
+```powershell
 cd scrapitor
 ```
 
@@ -202,19 +227,22 @@ The launcher will:
 | Linux | aarch64/arm64 | ARM servers, Raspberry Pi 4+ (64-bit) |
 | Linux | armv7l/armhf | Raspberry Pi 3 and older (32-bit) |
 
-**Install:**
-```bash
-# Option A: Download ZIP from GitHub and unzip
+**Option A:** Download ZIP from GitHub → Code → Download ZIP → Unzip
 
-# Option B: Clone with Git
+**Option B:** Clone with Git:
+
+```bash
 git clone https://github.com/daksh-7/scrapitor
+```
+
+```bash
 cd scrapitor
 ```
 
-**Then:** Run the launcher script:
+**Then:** Run the launcher:
+
 ```bash
-chmod +x run.sh
-./run.sh
+chmod +x run.sh && ./run.sh
 ```
 
 The launcher will:
@@ -230,19 +258,26 @@ The launcher will:
 - On Apple Silicon, Rosetta is not required — native arm64 binary is used
 
 **Manual Setup (alternative):**
+
 ```bash
-# Create venv and install deps
 python3 -m venv app/.venv
+```
+
+```bash
 source app/.venv/bin/activate
+```
+
+```bash
 pip install -r app/requirements.txt
+```
 
-# Build frontend (requires Node.js 18+)
-cd frontend && npm install && npm run build && cd ..
-
-# Run server
+```bash
 python -m app.server
+```
 
-# In another terminal: start tunnel (optional)
+In another terminal (optional):
+
+```bash
 cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 ```
 
@@ -263,23 +298,25 @@ Run scrapitor directly on your Android device using Termux.
 | x86/x86_64 | Untested | Some Android emulators and Chromebooks |
 
 **Install:**
+
 ```bash
-# Update packages and install dependencies
-pkg update && pkg upgrade
-pkg install python git curl
+pkg update && pkg upgrade -y
+```
 
-# Clone the repository
+```bash
+pkg install python git curl cloudflared -y
+```
+
+```bash
 git clone https://github.com/daksh-7/scrapitor
-cd scrapitor
+```
 
-# Run the launcher
-chmod +x run.sh
-./run.sh
+```bash
+cd scrapitor && chmod +x run.sh && ./run.sh
 ```
 
 The launcher will:
 - Create a virtual environment at `app/.venv` and install dependencies
-- Auto-download cloudflared for ARM64 from GitHub releases
 - Detect Termux environment and show helpful tips
 - Start Flask on port 5000
 - Establish a Cloudflare tunnel and display the public URL
@@ -289,26 +326,32 @@ The launcher will:
 
 Android aggressively kills background apps to save battery. To keep scrapitor running:
 
+Option 1 (recommended): Run in a separate Termux session:
+
 ```bash
-# Option 1: Acquire wake lock (recommended)
-# Run this in a separate Termux session:
 termux-wake-lock
-
-# Option 2: Install termux-services for proper background support
-pkg install termux-services
-sv-enable crond  # Example service
-
-# Option 3: Disable battery optimization for Termux in Android settings
 ```
 
-**Optional packages:**
-```bash
-# For frontend building (large download, ~200MB)
-pkg install nodejs
+Option 2: Install termux-services:
 
-# For better LAN IP detection
-pkg install net-tools  # provides ifconfig
-pkg install iproute2   # provides ip command
+```bash
+pkg install termux-services
+```
+
+Option 3: Disable battery optimization for Termux in Android settings
+
+**Optional packages:**
+
+For frontend building (large download, ~200MB):
+
+```bash
+pkg install nodejs
+```
+
+For better LAN IP detection:
+
+```bash
+pkg install net-tools iproute2
 ```
 
 **Tips for Termux:**
@@ -397,20 +440,33 @@ Versions are stored in `app/var/logs/parsed/<json_stem>/`.
 
 ## CLI Usage
 
+Default parse (no filtering):
+
 ```bash
-# Default parse (no filtering)
 python app/parser/parser.py path/to/log.json
+```
 
-# Omit tags (blacklist)
+Omit tags (blacklist):
+
+```bash
 python app/parser/parser.py --preset custom --omit-tags scenario,persona log.json
+```
 
-# Include only selected tags (whitelist)
+Include only selected tags (whitelist):
+
+```bash
 python app/parser/parser.py --preset custom --include-tags miku,scenario,first_message log.json
+```
 
-# Strip tag markers but keep content
+Strip tag markers but keep content:
+
+```bash
 python app/parser/parser.py --preset custom --strip-tags scenario log.json
+```
 
-# Control output location and versioning
+Control output location and versioning:
+
+```bash
 python app/parser/parser.py --output-dir out --suffix v2 log.json
 ```
 
@@ -468,7 +524,6 @@ Configuration can be set via:
 ### Example `.env` file
 
 ```bash
-# Create a .env file in the scrapitor root folder
 PROXY_PORT=8080
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 LOG_LEVEL=DEBUG
@@ -509,20 +564,33 @@ Cross-platform containerized deployment using Docker Compose. Ideal for servers,
 
 ### Quick Start
 
+Build and start all services (foreground):
+
 ```bash
-# Build and start all services (foreground)
 docker compose up --build
+```
 
-# Build and start in background (detached)
+Build and start in background (detached):
+
+```bash
 docker compose up -d --build
+```
 
-# View live logs
+View live logs:
+
+```bash
 docker compose logs -f
+```
 
-# Stop all services
+Stop all services:
+
+```bash
 docker compose down
+```
 
-# Stop and remove volumes (clean slate)
+Stop and remove volumes (clean slate):
+
+```bash
 docker compose down -v
 ```
 
@@ -542,13 +610,10 @@ The `tunnel` service waits for `proxy` to be healthy before starting, then write
 Create a `.env` file in the repository root to configure Docker:
 
 ```bash
-# .env file for Docker Compose
 PROXY_PORT=5000
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 LOG_LEVEL=INFO
 MAX_LOG_FILES=1000
-
-# Optional: custom cloudflared flags
 CLOUDFLARED_FLAGS=--edge-ip-version 4 --loglevel info
 ```
 
@@ -556,26 +621,45 @@ All environment variables from the [Configuration](#configuration) section are s
 
 ### Common Commands
 
+Start proxy only (no tunnel):
+
 ```bash
-# Start proxy only (no tunnel — use for local-only access)
 docker compose up --build proxy
+```
 
-# View proxy logs only
+View proxy logs only:
+
+```bash
 docker compose logs -f proxy
+```
 
-# View tunnel logs only
+View tunnel logs only:
+
+```bash
 docker compose logs -f tunnel
+```
 
-# Rebuild after code changes
+Rebuild after code changes:
+
+```bash
 docker compose up --build --force-recreate
+```
 
-# Check service status
+Check service status:
+
+```bash
 docker compose ps
+```
 
-# Execute command in running container
+Execute command in running container:
+
+```bash
 docker compose exec proxy python -c "print('hello')"
+```
 
-# View resource usage
+View resource usage:
+
+```bash
 docker compose stats
 ```
 
@@ -629,11 +713,11 @@ depends_on:
 | Issue | Solution |
 |-------|----------|
 | **"Permission denied" on run.sh** | Run `chmod +x run.sh` first |
-| **"Python not found"** | Install Python 3.10+: `sudo apt install python3` (Ubuntu) or `brew install python3` (macOS) |
-| **"Venv Creation Failed"** | Install venv module: `sudo apt install python3.12-venv` (Ubuntu/Debian — use your Python version) |
-| **"curl not found"** | Install curl: `sudo apt install curl` (Ubuntu) or `brew install curl` (macOS) |
-| **"Bash 3.0+ required"** | Upgrade bash: `brew install bash` (macOS) or `sudo apt install bash` (Linux) |
-| **Cloudflared download fails** | Install manually: `brew install cloudflared` (macOS) or download from [GitHub releases](https://github.com/cloudflare/cloudflared/releases) |
+| **"Python not found"** | Install Python 3.10+: `sudo apt install python3` or `brew install python3` |
+| **"Venv Creation Failed"** | Install venv module: `sudo apt install python3.12-venv` (use your Python version) |
+| **"curl not found"** | Install curl: `sudo apt install curl` or `brew install curl` |
+| **"Bash 3.0+ required"** | Upgrade bash: `brew install bash` or `sudo apt install bash` |
+| **Cloudflared download fails** | Install manually: `brew install cloudflared` or download from [GitHub releases](https://github.com/cloudflare/cloudflared/releases) |
 | **macOS Gatekeeper blocks cloudflared** | Run `xattr -d com.apple.quarantine app/scripts/cloudflared` |
 
 ### Termux/Android Issues
@@ -643,9 +727,9 @@ depends_on:
 | **"Python not found"** | Run `pkg install python` |
 | **"curl not found"** | Run `pkg install curl` |
 | **Termux killed in background** | Run `termux-wake-lock` in another session, or disable battery optimization |
-| **Cloudflared "unexpected e_type: 2"** | The auto-downloaded binary is incompatible. Install via Termux: `pkg install cloudflared` |
-| **Cloudflared fails / "check internet"** | Mobile carriers often block QUIC. Try: `export CLOUDFLARED_FLAGS="--protocol http2"` then re-run |
-| **Cloudflared fails on Android** | Ensure you have an ARM64 device; 32-bit ARM (armv7l) is not supported |
+| **Cloudflared "unexpected e_type: 2"** | Install via Termux: `pkg install cloudflared` |
+| **Cloudflared fails / "check internet"** | Try: `export CLOUDFLARED_FLAGS="--protocol http2"` then re-run |
+| **Cloudflared fails on Android** | Ensure you have an ARM64 device; 32-bit ARM is not supported |
 | **No LAN IP detected** | Run `pkg install net-tools` or `pkg install iproute2` |
 | **Storage permission denied** | Run `termux-setup-storage` and grant permission |
 
@@ -667,17 +751,33 @@ depends_on:
 
 ### Backend
 
+Create virtual environment:
+
 ```bash
-# Create virtual environment
 python -m venv app/.venv
+```
 
-# Activate and install (Windows)
+Activate and install (Windows):
+
+```powershell
 app\.venv\Scripts\pip install -r app/requirements.txt
-app\.venv\Scripts\python -m app.server
+```
 
-# Activate and install (Linux/macOS)
+```powershell
+app\.venv\Scripts\python -m app.server
+```
+
+Activate and install (Linux/macOS):
+
+```bash
 source app/.venv/bin/activate
+```
+
+```bash
 pip install -r app/requirements.txt
+```
+
+```bash
 python -m app.server
 ```
 
@@ -685,10 +785,28 @@ python -m app.server
 
 ```bash
 cd frontend
+```
+
+```bash
 npm install
-npm run dev      # Dev server with hot reload (port 5173)
-npm run build    # Production build to ../app/static/dist/
-npm run check    # Type check
+```
+
+Dev server with hot reload (port 5173):
+
+```bash
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+Type check:
+
+```bash
+npm run check
 ```
 
 ### Project Structure
