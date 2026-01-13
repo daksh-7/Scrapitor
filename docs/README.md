@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo.svg" alt="Scrapitor Logo" width="180" height="180">
+  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo_dark.svg" alt="Scrapitor Logo" width="180" height="180">
 </p>
 
 <h1 align="center">Scrapitor</h1>
@@ -22,7 +22,7 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 ## Quick Start (Windows)
 
 ```
-1. Download: https://github.com/daksh-7/Scrapitor → Code → Download ZIP → Unzip
+1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
 2. Run: Double-click run.bat
 3. Copy the Cloudflare Proxy URL from the terminal
 4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
@@ -30,6 +30,32 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 ```
 
 **Requirements:** Python 3.10+ and PowerShell 7. The launcher auto-installs everything else.
+
+## Quick Start (Linux/macOS)
+
+```
+1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
+2. Run: ./run.sh (or bash run.sh)
+3. Copy the Cloudflare Proxy URL from the terminal
+4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
+5. Send a message — your request appears in the dashboard Activity tab
+```
+
+**Requirements:** Python 3.10+, curl, and bash. The launcher auto-installs cloudflared and Python dependencies.
+
+## Quick Start (Termux/Android)
+
+```
+1. Install Termux from F-Droid (not Play Store — the Play Store version is outdated)
+2. Run: pkg update && pkg install python git curl
+3. Run: git clone https://github.com/daksh-7/scrapitor && cd scrapitor
+4. Run: chmod +x run.sh && ./run.sh
+5. Run: termux-wake-lock (in another session) to prevent Android from killing the process
+6. Copy the Cloudflare Proxy URL from the terminal
+7. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
+```
+
+**Requirements:** Termux with python, curl, and git packages. ARM64 device required (most modern Android phones). The launcher auto-installs cloudflared.
 
 ---
 
@@ -139,7 +165,7 @@ The launcher will:
 ███████║╚██████╗██║  ██║██║  ██║██║     ██║   ██║   ╚██████╔╝██║  ██║
 ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-  [✓] Python 3.12.0 found
+  [✓] Python 3.14.0 found
   [✓] Dependencies up to date
   [✓] Cloudflared ready
   [✓] Flask healthy on :5000
@@ -154,10 +180,49 @@ The launcher will:
 
 ### macOS / Linux
 
-```bash
-# Clone and setup
-git clone https://github.com/daksh-7/Scrapitor && cd Scrapitor
+**Prerequisites:**
+- Python 3.10+ (most systems have this pre-installed)
+- Bash 3.0+ (macOS ships with 3.2, Linux typically has 4.0+)
+- curl (for cloudflared download)
 
+**Supported Architectures:**
+| Platform | Architecture | Notes |
+|----------|--------------|-------|
+| macOS | Apple Silicon (M1/M2/M3/M4) | arm64 binary auto-downloaded |
+| macOS | Intel | amd64 binary auto-downloaded |
+| Linux | x86_64/amd64 | Standard servers and desktops |
+| Linux | aarch64/arm64 | ARM servers, Raspberry Pi 4+ (64-bit) |
+| Linux | armv7l/armhf | Raspberry Pi 3 and older (32-bit) |
+
+**Install:**
+```bash
+# Option A: Download ZIP from GitHub and unzip
+
+# Option B: Clone with Git
+git clone https://github.com/daksh-7/scrapitor
+cd Scrapitor
+```
+
+**Then:** Run the launcher script:
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+The launcher will:
+- Create a virtual environment at `app/.venv` and install dependencies
+- Auto-download cloudflared from GitHub releases (if not found in PATH)
+- Build the Svelte frontend (if Node.js is available and sources changed)
+- Start Flask on port 5000
+- Establish a Cloudflare tunnel and display the public URL
+- Show live status with uptime (press Q to quit gracefully)
+
+**macOS Notes:**
+- If you prefer Homebrew: `brew install cloudflared` (then the launcher uses the system binary)
+- On Apple Silicon, Rosetta is not required — native arm64 binary is used
+
+**Manual Setup (alternative):**
+```bash
 # Create venv and install deps
 python3 -m venv app/.venv
 source app/.venv/bin/activate
@@ -172,6 +237,77 @@ python -m app.server
 # In another terminal: start tunnel (optional)
 cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 ```
+
+### Termux (Android)
+
+Run Scrapitor directly on your Android device using Termux.
+
+**Prerequisites:**
+- Install [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/) (the Play Store version is outdated and will not work)
+- ARM64 device required (most Android phones from 2017+ are ARM64)
+- Grant storage permissions: `termux-setup-storage`
+
+**Device Compatibility:**
+| Architecture | Supported | Notes |
+|--------------|-----------|-------|
+| ARM64 (aarch64) | Yes | Most modern Android phones and tablets |
+| ARM32 (armv7l) | No | Older devices; cloudflared binary not available |
+| x86/x86_64 | Untested | Some Android emulators and Chromebooks |
+
+**Install:**
+```bash
+# Update packages and install dependencies
+pkg update && pkg upgrade
+pkg install python git curl
+
+# Clone the repository
+git clone https://github.com/daksh-7/Scrapitor
+cd Scrapitor
+
+# Run the launcher
+chmod +x run.sh
+./run.sh
+```
+
+The launcher will:
+- Create a virtual environment at `app/.venv` and install dependencies
+- Auto-download cloudflared for ARM64 from GitHub releases
+- Detect Termux environment and show helpful tips
+- Start Flask on port 5000
+- Establish a Cloudflare tunnel and display the public URL
+- Show live status with uptime (press Q to quit gracefully)
+
+**Preventing Android from Killing Termux:**
+
+Android aggressively kills background apps to save battery. To keep Scrapitor running:
+
+```bash
+# Option 1: Acquire wake lock (recommended)
+# Run this in a separate Termux session:
+termux-wake-lock
+
+# Option 2: Install termux-services for proper background support
+pkg install termux-services
+sv-enable crond  # Example service
+
+# Option 3: Disable battery optimization for Termux in Android settings
+```
+
+**Optional packages:**
+```bash
+# For frontend building (large download, ~200MB)
+pkg install nodejs
+
+# For better LAN IP detection
+pkg install net-tools  # provides ifconfig
+pkg install iproute2   # provides ip command
+```
+
+**Tips for Termux:**
+- Access the dashboard from your device's browser at `http://localhost:5000`
+- Use a split-screen or floating window to keep Termux visible
+- The LAN URL (e.g., `http://192.168.x.x:5000`) works for other devices on your WiFi
+- If you see "Termux killed in background," the wake-lock wasn't active
 
 ---
 
@@ -350,35 +486,169 @@ LOG_LEVEL=DEBUG
 
 ## Docker
 
-Cross-platform alternative using Docker Compose.
+Cross-platform containerized deployment using Docker Compose. Ideal for servers, NAS devices, and consistent deployments.
+
+**Prerequisites:**
+- Docker Engine 20.10+ or Docker Desktop
+- Docker Compose v2 (`docker compose` command)
+
+**Architecture Support:**
+| Architecture | Proxy Container | Tunnel Container |
+|--------------|-----------------|------------------|
+| amd64 (x86_64) | Yes | Yes |
+| arm64 (aarch64) | Yes | Yes |
+| arm/v7 (armhf) | Yes | Yes |
+
+### Quick Start
 
 ```bash
-# Start both proxy and tunnel
+# Build and start all services (foreground)
 docker compose up --build
 
-# Proxy only (no tunnel)
-docker compose up --build proxy
+# Build and start in background (detached)
+docker compose up -d --build
 
-# View logs
-docker compose logs -f proxy
-docker compose logs -f tunnel
+# View live logs
+docker compose logs -f
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (clean slate)
+docker compose down -v
 ```
 
-The `tunnel` container detects the Cloudflare URL and writes it to `app/var/state/tunnel_url.txt` for the dashboard.
+### Services
+
+The `docker-compose.yml` defines two services:
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `proxy` | Flask server with frontend | 5000 (configurable) |
+| `tunnel` | Cloudflared quick tunnel | N/A (outbound only) |
+
+The `tunnel` service waits for `proxy` to be healthy before starting, then writes the detected Cloudflare URL to `app/var/state/tunnel_url.txt` for the dashboard.
+
+### Configuration with .env
+
+Create a `.env` file in the repository root to configure Docker:
+
+```bash
+# .env file for Docker Compose
+PROXY_PORT=5000
+OPENROUTER_API_KEY=sk-or-v1-xxxxx
+LOG_LEVEL=INFO
+MAX_LOG_FILES=1000
+
+# Optional: custom cloudflared flags
+CLOUDFLARED_FLAGS=--edge-ip-version 4 --loglevel info
+```
+
+All environment variables from the [Configuration](#configuration) section are supported.
+
+### Common Commands
+
+```bash
+# Start proxy only (no tunnel — use for local-only access)
+docker compose up --build proxy
+
+# View proxy logs only
+docker compose logs -f proxy
+
+# View tunnel logs only
+docker compose logs -f tunnel
+
+# Rebuild after code changes
+docker compose up --build --force-recreate
+
+# Check service status
+docker compose ps
+
+# Execute command in running container
+docker compose exec proxy python -c "print('hello')"
+
+# View resource usage
+docker compose stats
+```
+
+### Persistent Data
+
+Logs and state are persisted via volume mount:
+
+```
+./app/var → /workspace/app/var (inside containers)
+```
+
+This includes:
+- `var/logs/` — captured JSON request logs
+- `var/logs/parsed/` — parsed TXT outputs
+- `var/state/tunnel_url.txt` — current tunnel URL
+
+### Health Checks
+
+The proxy container includes a built-in health check that polls `/health` every 5 seconds. The tunnel container only starts after the proxy is confirmed healthy:
+
+```yaml
+depends_on:
+  proxy:
+    condition: service_healthy
+```
 
 ---
 
 ## Troubleshooting
 
+### General Issues
+
 | Issue | Solution |
 |-------|----------|
-| **No Cloudflare URL** | Check internet; verify firewall allows cloudflared |
-| **"PowerShell 7 required"** | Run `winget install Microsoft.PowerShell` |
-| **Port already in use** | Set `PROXY_PORT` to another port |
+| **No Cloudflare URL** | Check internet; verify firewall allows cloudflared outbound |
+| **Port already in use** | Set `PROXY_PORT` to another port in `.env` |
 | **502 from OpenRouter** | Ensure `Authorization` header is in the request |
 | **NGINX error from trycloudflare URL** | Enable Secure DNS (1.1.1.1) in your browser or OS |
 | **Frontend not loading** | Run `cd frontend && npm install && npm run build` |
 | **Missing parser output fields** | Use "Detect Tags" and adjust Include/Exclude settings |
+
+### Windows Issues
+
+| Issue | Solution |
+|-------|----------|
+| **"PowerShell 7 required"** | Run `winget install Microsoft.PowerShell` |
+| **Script execution disabled** | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+
+### Linux/macOS Issues
+
+| Issue | Solution |
+|-------|----------|
+| **"Permission denied" on run.sh** | Run `chmod +x run.sh` first |
+| **"Python not found"** | Install Python 3.10+: `sudo apt install python3` (Ubuntu) or `brew install python3` (macOS) |
+| **"curl not found"** | Install curl: `sudo apt install curl` (Ubuntu) or `brew install curl` (macOS) |
+| **"Bash 3.0+ required"** | Upgrade bash: `brew install bash` (macOS) or `sudo apt install bash` (Linux) |
+| **Cloudflared download fails** | Install manually: `brew install cloudflared` (macOS) or download from [GitHub releases](https://github.com/cloudflare/cloudflared/releases) |
+| **macOS Gatekeeper blocks cloudflared** | Run `xattr -d com.apple.quarantine app/scripts/cloudflared` |
+
+### Termux/Android Issues
+
+| Issue | Solution |
+|-------|----------|
+| **"Python not found"** | Run `pkg install python` |
+| **"curl not found"** | Run `pkg install curl` |
+| **Termux killed in background** | Run `termux-wake-lock` in another session, or disable battery optimization |
+| **Cloudflared fails on Android** | Ensure you have an ARM64 device; 32-bit ARM (armv7l) is not supported |
+| **No LAN IP detected** | Run `pkg install net-tools` or `pkg install iproute2` |
+| **Storage permission denied** | Run `termux-setup-storage` and grant permission |
+
+### Docker Issues
+
+| Issue | Solution |
+|-------|----------|
+| **"docker compose" not found** | Install Docker Compose v2 or use `docker-compose` (v1 syntax) |
+| **Tunnel fails to start** | Check `docker compose logs tunnel`; proxy must be healthy first |
+| **Port conflict** | Change `PROXY_PORT` in `.env` or stop conflicting service |
+| **Permission denied on volumes** | Check ownership of `./app/var` directory |
+| **Container exits immediately** | Run `docker compose logs proxy` to see error output |
+| **No tunnel URL in dashboard** | Wait 30-60 seconds; check `docker compose logs -f tunnel` |
+| **Build fails on ARM** | Ensure BuildKit is enabled: `DOCKER_BUILDKIT=1 docker compose build` |
 
 ---
 
@@ -387,9 +657,17 @@ The `tunnel` container detects the Cloudflare URL and writes it to `app/var/stat
 ### Backend
 
 ```bash
+# Create virtual environment
 python -m venv app/.venv
-app/.venv/Scripts/pip install -r app/requirements.txt  # Windows
-app/.venv/Scripts/python -m app.server
+
+# Activate and install (Windows)
+app\.venv\Scripts\pip install -r app/requirements.txt
+app\.venv\Scripts\python -m app.server
+
+# Activate and install (Linux/macOS)
+source app/.venv/bin/activate
+pip install -r app/requirements.txt
+python -m app.server
 ```
 
 ### Frontend
@@ -407,25 +685,45 @@ npm run check    # Type check
 ```
 Scrapitor/
 ├── app/
-│   ├── parser/           # Tag-aware parser engine
+│   ├── parser/              # Tag-aware parser engine
 │   │   └── parser.py
-│   ├── scripts/          # PowerShell launcher + modules
-│   │   ├── run_proxy.ps1
-│   │   └── lib/          # UI, Config, Process, Python, Tunnel modules
-│   ├── static/dist/      # Compiled Svelte SPA
-│   ├── var/              # Runtime data (logs, state)
-│   └── server.py         # Flask application
+│   ├── scripts/             # Launcher scripts + modules
+│   │   ├── run_proxy.ps1    # Windows (PowerShell) orchestrator
+│   │   ├── run_proxy.sh     # Linux/macOS/Termux (Bash) orchestrator
+│   │   └── lib/             # Shared modules
+│   │       ├── *.psm1       # PowerShell modules (Config, Process, Python, Tunnel, UI)
+│   │       └── *.sh         # Bash modules (config, process, python, tunnel, ui)
+│   ├── static/
+│   │   ├── assets/          # Logo SVGs, manifest
+│   │   └── dist/            # Compiled Svelte SPA (generated)
+│   ├── var/                 # Runtime data (generated)
+│   │   ├── logs/            # Captured JSON request logs
+│   │   └── state/           # PID files, tunnel URL
+│   ├── requirements.txt     # Python dependencies
+│   └── server.py            # Flask application
 ├── frontend/
 │   ├── src/
 │   │   ├── lib/
-│   │   │   ├── api/      # Typed API client
-│   │   │   ├── components/
-│   │   │   └── stores/   # Svelte 5 runes state
-│   │   └── routes/       # Overview, Parser, Activity pages
+│   │   │   ├── api/         # Typed API client
+│   │   │   ├── components/  # Svelte UI components
+│   │   │   └── stores/      # Svelte 5 runes state
+│   │   ├── routes/          # Overview, Parser, Activity pages
+│   │   ├── App.svelte       # Root component
+│   │   └── main.ts          # Entry point
+│   ├── index.html
+│   ├── package.json
 │   └── vite.config.ts
 ├── docker/
-├── run.bat               # Windows launcher
-└── docker-compose.yml
+│   ├── Dockerfile           # Proxy container (Python + frontend)
+│   └── tunnel/
+│       ├── Dockerfile       # Tunnel container (Alpine + cloudflared)
+│       └── entrypoint.sh
+├── docs/
+│   ├── README.md            # This file
+│   └── RELEASE_v*.md        # Release notes
+├── run.bat                  # Windows launcher
+├── run.sh                   # Linux/macOS/Termux launcher
+└── docker-compose.yml       # Docker orchestration
 ```
 
 ---
