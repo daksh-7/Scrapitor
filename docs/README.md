@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo_dark.svg" alt="Scrapitor Logo" width="180" height="180">
+  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo_black.svg" alt="Scrapitor Logo" width="180" height="180">
 </p>
 
 <h1 align="center">Scrapitor</h1>
@@ -61,8 +61,14 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 
 ## Table of Contents
 
+- [Quick Start (Windows)](#quick-start-windows)
+- [Quick Start (Linux/macOS)](#quick-start-linuxmacos)
+- [Quick Start (Termux/Android)](#quick-start-termuxandroid)
 - [Architecture](#architecture)
 - [Installation](#installation)
+  - [Windows](#windows-recommended)
+  - [macOS / Linux](#macos--linux)
+  - [Termux (Android)](#termux-android)
 - [Configuring JanitorAI](#configuring-janitorai)
 - [Web Dashboard](#web-dashboard)
 - [Parser System](#parser-system)
@@ -72,6 +78,7 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 - [Docker](#docker)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [Notes](#notes)
 
 ---
 
