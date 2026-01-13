@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/daksh-7/Scrapitor/main/app/static/assets/logo_black.svg" alt="Scrapitor Logo" width="180" height="180">
+  <img src="https://raw.githubusercontent.com/daksh-7/scrapitor/main/app/static/assets/logo_black.svg" alt="scrapitor Logo" width="180" height="180">
 </p>
 
-<h1 align="center">Scrapitor</h1>
+<h1 align="center">scrapitor</h1>
 
 <p align="center">
   <strong>Intercept. Parse. Export.</strong>
@@ -21,41 +21,41 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 
 ## Quick Start (Windows)
 
-```
 1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
-2. Run: Double-click run.bat
+2. Double-click `run.bat`
 3. Copy the Cloudflare Proxy URL from the terminal
 4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
 5. Send a message — your request appears in the dashboard Activity tab
-```
 
 **Requirements:** Python 3.10+ and PowerShell 7. The launcher auto-installs everything else.
 
 ## Quick Start (Linux/macOS)
 
-```
 1. Download: https://github.com/daksh-7/scrapitor → Code → Download ZIP → Unzip
-2. Run: ./run.sh (or bash run.sh)
+2. Run the launcher:
+```bash
+./run.sh
+```
 3. Copy the Cloudflare Proxy URL from the terminal
 4. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
 5. Send a message — your request appears in the dashboard Activity tab
-```
 
 **Requirements:** Python 3.10+, curl, and bash. The launcher auto-installs cloudflared and Python dependencies.
 
 ## Quick Start (Termux/Android)
 
+1. Install Termux from [F-Droid](https://f-droid.org/en/packages/com.termux/) (not Play Store — it's outdated)
+2. Install dependencies and clone:
+```bash
+pkg update && pkg install python git curl cloudflared
+git clone https://github.com/daksh-7/scrapitor && cd scrapitor
+chmod +x run.sh && ./run.sh
 ```
-1. Install Termux from F-Droid (not Play Store — the Play Store version is outdated)
-2. Run: pkg update && pkg install python git curl
-3. Run: git clone https://github.com/daksh-7/scrapitor && cd scrapitor
-4. Run: chmod +x run.sh && ./run.sh
-5. Run: termux-wake-lock (in another session) to prevent Android from killing the process
-6. Copy the Cloudflare Proxy URL from the terminal
-7. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
-```
+3. In another Termux session, run `termux-wake-lock` to prevent Android from killing the process
+4. Copy the Cloudflare Proxy URL from the terminal
+5. In JanitorAI: Enable "Using proxy" → paste the URL → add your OpenRouter API key
 
-**Requirements:** Termux with python, curl, and git packages. ARM64 device required (most modern Android phones). The launcher auto-installs cloudflared.
+**Requirements:** Termux with python, curl, git, and cloudflared packages. ARM64 device required (most modern Android phones).
 
 ---
 
@@ -88,7 +88,7 @@ A local proxy that intercepts JanitorAI traffic, captures request payloads as JS
 graph LR
     %% --- NODES & DATA ---
     J([JanitorAI<br/>Browser Client])
-    S[Scrapitor<br/>Flask Proxy]
+    S[scrapitor<br/>Flask Proxy]
     OR(OpenRouter<br/>API)
 
     subgraph Data_Processing [Data Processing & UI]
@@ -131,8 +131,8 @@ graph LR
 
 **Data Flow:**
 
-1. JanitorAI sends chat requests to the Scrapitor proxy (via Cloudflare tunnel)
-2. Scrapitor logs the full request payload as JSON, then forwards to OpenRouter
+1. JanitorAI sends chat requests to the scrapitor proxy (via Cloudflare tunnel)
+2. scrapitor logs the full request payload as JSON, then forwards to OpenRouter
 3. The parser extracts character data using tag-aware rules
 4. Parsed content is saved as versioned `.txt` files or exported to SillyTavern JSON
 
@@ -151,11 +151,11 @@ graph LR
 # Option A: Download ZIP from GitHub and unzip
 
 # Option B: Clone with Git
-git clone https://github.com/daksh-7/Scrapitor
-cd Scrapitor
+git clone https://github.com/daksh-7/scrapitor
+cd scrapitor
 ```
 
-**Then:** Double-click run.bat
+**Then:** Double-click `run.bat`
 
 The launcher will:
 - Create a virtual environment and install dependencies
@@ -207,7 +207,7 @@ The launcher will:
 
 # Option B: Clone with Git
 git clone https://github.com/daksh-7/scrapitor
-cd Scrapitor
+cd scrapitor
 ```
 
 **Then:** Run the launcher script:
@@ -247,7 +247,7 @@ cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000
 
 ### Termux (Android)
 
-Run Scrapitor directly on your Android device using Termux.
+Run scrapitor directly on your Android device using Termux.
 
 **Prerequisites:**
 - Install [Termux from F-Droid](https://f-droid.org/en/packages/com.termux/) (the Play Store version is outdated and will not work)
@@ -268,8 +268,8 @@ pkg update && pkg upgrade
 pkg install python git curl
 
 # Clone the repository
-git clone https://github.com/daksh-7/Scrapitor
-cd Scrapitor
+git clone https://github.com/daksh-7/scrapitor
+cd scrapitor
 
 # Run the launcher
 chmod +x run.sh
@@ -286,7 +286,7 @@ The launcher will:
 
 **Preventing Android from Killing Termux:**
 
-Android aggressively kills background apps to save battery. To keep Scrapitor running:
+Android aggressively kills background apps to save battery. To keep scrapitor running:
 
 ```bash
 # Option 1: Acquire wake lock (recommended)
@@ -467,7 +467,7 @@ Configuration can be set via:
 ### Example `.env` file
 
 ```bash
-# Create a .env file in the Scrapitor root folder
+# Create a .env file in the scrapitor root folder
 PROXY_PORT=8080
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 LOG_LEVEL=DEBUG
@@ -629,6 +629,7 @@ depends_on:
 |-------|----------|
 | **"Permission denied" on run.sh** | Run `chmod +x run.sh` first |
 | **"Python not found"** | Install Python 3.10+: `sudo apt install python3` (Ubuntu) or `brew install python3` (macOS) |
+| **"Venv Creation Failed"** | Install venv module: `sudo apt install python3.12-venv` (Ubuntu/Debian — use your Python version) |
 | **"curl not found"** | Install curl: `sudo apt install curl` (Ubuntu) or `brew install curl` (macOS) |
 | **"Bash 3.0+ required"** | Upgrade bash: `brew install bash` (macOS) or `sudo apt install bash` (Linux) |
 | **Cloudflared download fails** | Install manually: `brew install cloudflared` (macOS) or download from [GitHub releases](https://github.com/cloudflare/cloudflared/releases) |
@@ -641,6 +642,8 @@ depends_on:
 | **"Python not found"** | Run `pkg install python` |
 | **"curl not found"** | Run `pkg install curl` |
 | **Termux killed in background** | Run `termux-wake-lock` in another session, or disable battery optimization |
+| **Cloudflared "unexpected e_type: 2"** | The auto-downloaded binary is incompatible. Install via Termux: `pkg install cloudflared` |
+| **Cloudflared fails / "check internet"** | Mobile carriers often block QUIC. Try: `export CLOUDFLARED_FLAGS="--protocol http2"` then re-run |
 | **Cloudflared fails on Android** | Ensure you have an ARM64 device; 32-bit ARM (armv7l) is not supported |
 | **No LAN IP detected** | Run `pkg install net-tools` or `pkg install iproute2` |
 | **Storage permission denied** | Run `termux-setup-storage` and grant permission |
@@ -690,7 +693,7 @@ npm run check    # Type check
 ### Project Structure
 
 ```
-Scrapitor/
+scrapitor/
 ├── app/
 │   ├── parser/              # Tag-aware parser engine
 │   │   └── parser.py
@@ -737,6 +740,6 @@ Scrapitor/
 
 ## Notes
 
-- Scrapitor is **not affiliated** with JanitorAI or OpenRouter
+- scrapitor is **not affiliated** with JanitorAI or OpenRouter
 - Cloudflare tunnels expose a public URL — treat it like any internet-facing service
 - **Respect creator rights:** Obtain permission before exporting/distributing character data

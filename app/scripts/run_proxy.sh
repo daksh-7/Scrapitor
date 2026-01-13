@@ -117,12 +117,21 @@ main() {
     local venv_created=false
     if ! test_venv_exists "$CONFIG_VENV_PATH"; then
         write_spinner "Creating virtual environment..."
-        if ! create_python_venv "$CONFIG_VENV_PATH" "$PYTHON_PATH"; then
+        local venv_output
+        venv_output=$(create_python_venv "$CONFIG_VENV_PATH" "$PYTHON_PATH" 2>&1)
+        local venv_exit=$?
+        
+        if [[ $venv_exit -ne 0 ]]; then
             clear_spinner_line
+            local install_hint
+            install_hint=$(get_venv_install_hint "$PYTHON_PATH")
             show_error_box "Venv Creation Failed" \
                 "Could not create virtual environment." \
                 "" \
-                "Try manually: ${PYTHON_PATH} -m venv ${CONFIG_VENV_PATH}"
+                "The Python venv module is missing. Install it:" \
+                "  ${install_hint}" \
+                "" \
+                "Then re-run this script."
             exit 1
         fi
         clear_spinner_line
@@ -162,14 +171,25 @@ main() {
                 write_status "Cloudflared installed via ${CLOUDFLARED_SOURCE}" "Success"
             else
                 clear_spinner_line
-                show_error_box "Cloudflared Installation Failed" \
-                    "Could not install cloudflared automatically." \
-                    "" \
-                    "Manual install options:" \
-                    "  macOS:  brew install cloudflared" \
-                    "  Linux:  Download from GitHub releases" \
-                    "" \
-                    "https://github.com/cloudflare/cloudflared/releases"
+                # Show platform-specific install instructions
+                if is_termux; then
+                    show_error_box "Cloudflared Installation Failed" \
+                        "Could not install cloudflared automatically." \
+                        "" \
+                        "Install manually in Termux:" \
+                        "  pkg install cloudflared" \
+                        "" \
+                        "Then re-run this script."
+                else
+                    show_error_box "Cloudflared Installation Failed" \
+                        "Could not install cloudflared automatically." \
+                        "" \
+                        "Manual install options:" \
+                        "  macOS:   brew install cloudflared" \
+                        "  Ubuntu:  Download from GitHub releases" \
+                        "" \
+                        "https://github.com/cloudflare/cloudflared/releases"
+                fi
                 exit 1
             fi
         else

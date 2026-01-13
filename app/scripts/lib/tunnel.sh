@@ -89,10 +89,40 @@ get_system_os() {
     esac
 }
 
+# Check if running in Termux
+is_termux() {
+    [[ -n "${TERMUX_VERSION:-}" ]] || [[ -d "/data/data/com.termux" ]]
+}
+
+# Install cloudflared via Termux package manager
+# Returns 0 on success, 1 on failure
+install_cloudflared_termux() {
+    if command -v pkg &>/dev/null; then
+        if pkg install cloudflared -y &>/dev/null; then
+            if command -v cloudflared &>/dev/null; then
+                CLOUDFLARED_PATH=$(command -v cloudflared)
+                CLOUDFLARED_SOURCE="pkg"
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
 # Install cloudflared via direct download
 # Returns 0 on success, 1 on failure
 install_cloudflared() {
     local target_dir="$1"
+    
+    # Termux: GitHub binaries are NOT compatible (non-PIE)
+    # Must install via pkg instead
+    if is_termux; then
+        if install_cloudflared_termux; then
+            return 0
+        fi
+        echo "Termux detected. Install cloudflared with: pkg install cloudflared" >&2
+        return 1
+    fi
     
     local arch
     arch=$(get_system_arch)

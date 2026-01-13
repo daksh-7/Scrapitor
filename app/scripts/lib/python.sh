@@ -115,11 +115,109 @@ test_venv_exists() {
     [[ -x "$venv_python" ]]
 }
 
+# Check if venv/ensurepip module is available
+test_venv_module_available() {
+    local python_path="$1"
+    "$python_path" -c "import venv; import ensurepip" &>/dev/null
+}
+
+# Detect package manager and install python venv package
+# Returns 0 on success, 1 on failure
+install_venv_package() {
+    local python_path="$1"
+    
+    # Get Python version for package name (e.g., "3.12")
+    local py_version
+    py_version=$("$python_path" -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+    
+    # Termux - use pkg
+    if [[ -n "${TERMUX_VERSION:-}" ]] || [[ -d "/data/data/com.termux" ]]; then
+        pkg install python -y &>/dev/null && return 0
+        return 1
+    fi
+    
+    # Debian/Ubuntu - use apt
+    if command -v apt-get &>/dev/null; then
+        local pkg_name="python${py_version}-venv"
+        
+        # Try without sudo first (might be root or have permissions)
+        if apt-get install -y "$pkg_name" &>/dev/null; then
+            return 0
+        fi
+        
+        # Try with sudo
+        if command -v sudo &>/dev/null; then
+            if sudo apt-get install -y "$pkg_name" &>/dev/null; then
+                return 0
+            fi
+        fi
+        
+        return 1
+    fi
+    
+    # Fedora/RHEL - venv is included, but try anyway
+    if command -v dnf &>/dev/null; then
+        if sudo dnf install -y python3-libs &>/dev/null; then
+            return 0
+        fi
+        return 1
+    fi
+    
+    # Arch - venv is included with python
+    if command -v pacman &>/dev/null; then
+        return 0  # Should already work
+    fi
+    
+    # macOS - venv is included with python
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        return 0  # Should already work
+    fi
+    
+    return 1
+}
+
+# Get the venv package install command for error messages
+get_venv_install_hint() {
+    local python_path="$1"
+    
+    local py_version
+    py_version=$("$python_path" -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+    
+    if [[ -n "${TERMUX_VERSION:-}" ]] || [[ -d "/data/data/com.termux" ]]; then
+        echo "pkg install python"
+    elif command -v apt-get &>/dev/null; then
+        echo "sudo apt install python${py_version}-venv"
+    elif command -v dnf &>/dev/null; then
+        echo "sudo dnf install python3-libs"
+    else
+        echo "Install the python venv module for your system"
+    fi
+}
+
 # Create a new virtual environment
 # Returns 0 on success, 1 on failure
 create_python_venv() {
     local venv_path="$1"
     local python_path="$2"
+    
+    # Check if venv module is available, try to install if not
+    if ! test_venv_module_available "$python_path"; then
+        # Try auto-installing the venv package
+        if ! install_venv_package "$python_path"; then
+            local hint
+            hint=$(get_venv_install_hint "$python_path")
+            echo "Python venv module not available. Install it with: ${hint}" >&2
+            return 1
+        fi
+        
+        # Re-check after install
+        if ! test_venv_module_available "$python_path"; then
+            local hint
+            hint=$(get_venv_install_hint "$python_path")
+            echo "Python venv module still not available after install attempt. Try manually: ${hint}" >&2
+            return 1
+        fi
+    fi
     
     local output
     output=$("$python_path" -m venv "$venv_path" 2>&1)
