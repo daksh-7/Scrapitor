@@ -32,21 +32,18 @@ exit /b 0
 ::  Error: PowerShell 7 Required
 :: ═══════════════════════════════════════════════════════════════════════════
 :no_pwsh
-:: Generate ESC character for ANSI colors
-for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
-
 cls
 echo.
-echo   %ESC%[91m════════════════════════════════════════════════════════════%ESC%[0m
+echo   ════════════════════════════════════════════════════════════
 echo.
-echo   %ESC%[91m  PowerShell 7 is required but was not found.%ESC%[0m
+echo     PowerShell 7 is required but was not found.
 echo.
-echo   %ESC%[93m  Install it with:%ESC%[0m
-echo   %ESC%[96m  winget install Microsoft.PowerShell%ESC%[0m
+echo     Install it with:
+echo       winget install Microsoft.PowerShell
 echo.
-echo   %ESC%[90m  Then re-run this script.%ESC%[0m
+echo     Then re-run this script.
 echo.
-echo   %ESC%[91m════════════════════════════════════════════════════════════%ESC%[0m
+echo   ════════════════════════════════════════════════════════════
 echo.
 pause
 exit /b 1
